@@ -30,39 +30,6 @@ class StatusIn(BaseModel):
     status: str | None = None
 
 
-def _task_row(task: core.Task) -> dict[str, Any]:
-    return {
-        "id": task.id,
-        "title": task.title,
-        "status": task.status,
-        "counts": task.counts,
-        "override": task.override,
-        "warning": task.warning,
-        "last_activity": task.last_activity,
-    }
-
-
-def _task_detail(task: core.Task) -> dict[str, Any]:
-    return _task_row(task) | {
-        "description": task.description,
-        "folder": str(task.dir),
-        "sessions": [
-            {
-                "id": s.id,
-                "title": s.title,
-                "client": s.client,
-                "status": s.shown_status,
-                "alive": s.alive,
-                "started": s.started,
-                "heartbeat": s.heartbeat,
-                "summary": s.summary,
-                "progress": s.progress,
-            }
-            for s in task.sessions
-        ],
-    }
-
-
 def create_app() -> FastAPI:
     app = FastAPI(title="Duet", version=__version__, docs_url=None, redoc_url=None)
 
@@ -73,13 +40,13 @@ def create_app() -> FastAPI:
 
     @app.get("/api/tasks")
     def tasks(status: str | None = None) -> dict[str, Any]:
-        rows = [_task_row(t) for t in core.list_tasks(status)]
+        rows = [t.to_dict() for t in core.list_tasks(status)]
         return {"tasks": rows, "statuses": list(core.TASK_STATUSES), "home": str(core.home())}
 
     @app.get("/api/tasks/{task_id}")
     def task(task_id: str) -> dict[str, Any]:
         try:
-            return _task_detail(core.get_task(task_id))
+            return core.get_task(task_id).to_detail()
         except (core.DuetError, OSError) as e:
             raise HTTPException(status_code=404, detail=str(e))
 
@@ -87,7 +54,7 @@ def create_app() -> FastAPI:
     def set_status(task_id: str, body: StatusIn) -> dict[str, Any]:
         """사람이 정한 상태를 `task.md`에 적거나(=자동 규칙보다 우선) 지운다."""
         try:
-            return _task_detail(core.set_status(task_id, body.status))
+            return core.set_status(task_id, body.status).to_detail()
         except core.DuetError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except OSError as e:

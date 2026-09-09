@@ -98,6 +98,20 @@ class Session:
             return self.status
         return RUNNING if self.alive else STOPPED
 
+    def to_dict(self) -> dict[str, Any]:
+        """화면과 도구에 나가는 꼴. 파일에 적는 것과 달리 살아있는지도 알려준다."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "client": self.client,
+            "status": self.shown_status,
+            "alive": self.alive,
+            "started": self.started,
+            "heartbeat": self.heartbeat,
+            "summary": self.summary,
+            "progress": self.progress,
+        }
+
     def save(self) -> None:
         """임시 파일에 쓰고 바꿔치기한다. 읽는 쪽이 반쪽 JSON을 보지 않게."""
         data = {k: v for k, v in asdict(self).items() if k != "path"}
@@ -166,19 +180,24 @@ class Task:
         return ""
 
     def to_dict(self) -> dict[str, Any]:
-        data = {
+        """카드 한 장에 필요한 만큼."""
+        return {
             "id": self.id,
             "title": self.title,
-            "description": self.description,
             "status": self.status,
-            "sessions": self.counts,
+            "counts": self.counts,
+            "override": self.override,
+            "warning": self.warning,
             "last_activity": self.last_activity,
         }
-        if self.override:
-            data["사람이 정한 상태"] = self.override
-        if self.warning:
-            data["warning"] = self.warning
-        return data
+
+    def to_detail(self) -> dict[str, Any]:
+        """세션이 무엇을 했는지까지. 다른 세션이 읽고 이어받는 재료다."""
+        return self.to_dict() | {
+            "description": self.description,
+            "folder": str(self.dir),
+            "sessions": [s.to_dict() for s in self.sessions],
+        }
 
 
 def _read_task(task_dir: Path) -> Task:

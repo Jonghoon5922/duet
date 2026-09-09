@@ -121,6 +121,54 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         }
 
     @server.tool(
+        name="get_task",
+        description=(
+            "타스크 하나의 속을 본다 — 설명, 붙어 있는 세션들, 각 세션이 남긴 진행 로그. "
+            "**다른 세션이 어디까지 했는지 읽고 이어받을 때 쓴다.** 같은 타스크에 참여했다면 "
+            "일을 시작하기 전에 한 번 읽어라."
+        ),
+    )
+    def get_task_tool(ctx: Context, task_id: str) -> dict[str, Any]:
+        touch(ctx)
+        try:
+            task = core.get_task(task_id)
+        except (core.DuetError, OSError) as e:
+            return {"error": str(e)}
+
+        detail = task.to_detail()
+        mine = core.task_of(session)
+        if mine and mine.id == task.id:
+            # 자기 것을 빼주면 "남이 뭘 했나"만 남는다. 이어받을 때 읽는 자리다.
+            detail["내_세션"] = session.id
+        return detail
+
+    @server.tool(
+        name="pause_session",
+        description=(
+            "이 세션을 여기서 멈춘다(`중지`). 일이 끝나지 않았는데 사용자가 "
+            "\"여기까지\"라고 할 때 쓴다. 끝냈으면 complete_session이다. "
+            "중지된 세션이 있으면 타스크는 닫히지 않고 사람이 판단하도록 열린 채 남는다."
+        ),
+    )
+    def pause_session_tool(ctx: Context, reason: str) -> dict[str, Any]:
+        touch(ctx)
+        try:
+            with lock:
+                task = core.finish(session, core.STOPPED, reason)
+        except (core.DuetError, OSError) as e:
+            return {"error": str(e)}
+        if task is None:
+            return {"status": core.STOPPED, "note": "타스크에 참여하지 않아 닫히기만 했다."}
+        return {
+            "status": core.STOPPED,
+            "task": task.to_dict(),
+            "note": (
+                f"[{task.id}] {task.title} 은(는) 열어 둔다. 다음 세션이 get_task로 "
+                "여기까지의 로그를 읽고 이어받을 수 있다."
+            ),
+        }
+
+    @server.tool(
         name="report_progress",
         description=(
             "이 세션의 진행 로그를 한 줄 남긴다. 다음 세션이 읽고 이어받을 수 있게 "

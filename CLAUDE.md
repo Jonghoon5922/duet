@@ -28,7 +28,8 @@ Python 3.11+, uv, FastMCP, watchdog, FastAPI + SSE, 정적 HTML 한 장
 - [x] 스펙 초안 v2 (SPEC.md — 파일 기반 저장, Sprintra 확인 절 포함)
 - [x] 0단계: Sprintra 확인은 건너뛰기로 결정 (SPEC.md §0에 기록). 내 기준으로 만든다
 - [x] 1단계 프로토타입: core.py 하나에 파일 구조와 규칙, MCP 도구 5개 (stdio 실측 13건 통과)
-- [ ] 2단계: `get_task`·`update_task`·`pause_session`, instructions 주입, 중지 감지 실측
+- [x] 2단계: `get_task`·`pause_session` (인수인계 실측). instructions 주입·중지 감지는 1단계에서 끝냄
+- [ ] `update_task` (제목·설명을 Claude가 고치기) — 2단계 남은 것
 - [x] 3단계 뼈대: 대시보드 보드·필터·상태 편집 (폴링 2초. SSE와 제목·설명 인라인 편집은 아직)
 - [ ] 4단계: 타스크 상세·세션 타임라인·`app` 창
 - [ ] 5단계: PyPI `duet-mcp`, `.mcpb`, 인스톨러

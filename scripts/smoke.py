@@ -94,7 +94,7 @@ task_id = a.tool("create_task", {"title": "pc101pm 전환", "description": "NEFS
 md_before = (core.find_task(task_id) / "task.md").read_text(encoding="utf-8")
 
 joined = a.tool("join_task", {"task_id": task_id, "session_title": "DBIO 계층 전환"})
-check("A join → 타스크 진행중", joined["task"]["status"] == "진행중", str(joined["task"]["sessions"]))
+check("A join → 타스크 진행중", joined["task"]["status"] == "진행중", str(joined["task"]["counts"]))
 a.tool("report_progress", {"message": "DBIO 12개 중 5개 전환", "percent": 40})
 
 # 세션 B: 같은 타스크에 붙는다
@@ -119,6 +119,25 @@ a.close()
 b.close()
 check("창을 닫아도 완료 세션은 완료로 남는다",
       [s.status for s in core.get_task(task_id).sessions] == ["완료", "완료"])
+
+# 세션 C-0: get_task로 앞 세션들이 뭘 했는지 읽는다 (인수인계)
+reader = Client()
+detail = reader.tool("get_task", {"task_id": task_id})
+check("get_task가 다른 세션의 로그까지 준다",
+      [p["msg"] for s in detail["sessions"] for p in s["progress"]]
+      == ["DBIO 12개 중 5개 전환", "Bean 8개 전환"], str([s["title"] for s in detail["sessions"]]))
+check("get_task에 설명과 폴더가 들어 있다", detail["description"] == "NEFSS→BXM" and detail["folder"])
+
+# 그 세션은 붙었다가 도중에 멈춘다 (pause_session)
+reader.tool("join_task", {"task_id": task_id, "session_title": "이어받기 검토"})
+reader.tool("report_progress", {"message": "A와 B 로그 읽음. Service 계층이 남았다"})
+paused = reader.tool("pause_session", {"reason": "여기까지 — Service는 다음 세션에서"})
+check("pause_session → 세션 중지", paused["status"] == "중지", paused.get("note", ""))
+check("중지가 있으면 타스크는 열린 채", paused["task"]["status"] == "진행중")
+reader.close()
+check("멈춘 뒤 창을 닫아도 이유가 남는다",
+      [s.summary for s in core.get_task(task_id).sessions if s.title == "이어받기 검토"]
+      == ["여기까지 — Service는 다음 세션에서"])
 
 # 세션 C: 보고 없이 창을 닫는다 → 종료 훅이 중지로 적는다
 c = Client()

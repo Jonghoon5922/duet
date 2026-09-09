@@ -141,3 +141,21 @@ def test_깨진_파일_하나가_목록을_막지_않는다():
     (core.home() / core.IDLE_DIRNAME / "s-broken.json").write_text("{반쪽", encoding="utf-8")
 
     assert [t.id for t in core.list_tasks()] == [good.id]
+
+
+def test_상세에_다른_세션의_로그가_들어온다():
+    """세션 B가 A의 일을 읽고 이어받는 재료. get_task와 대시보드가 같이 쓴다."""
+    task = core.create_task("전환", "NEFSS→BXM")
+    a = core.register_session("Claude Code")
+    core.join(a, task.id, "DBIO 계층 전환")
+    core.report(a, "설계서 훑음", 30)
+    core.finish(a, core.STOPPED, "여기까지 — Service는 다음 세션에서")
+
+    detail = core.get_task(task.id).to_detail()
+    assert detail["description"] == "NEFSS→BXM"
+    assert detail["folder"] == str(task.dir)
+    assert detail["counts"] == {"진행중": 0, "완료": 0, "중지": 1}
+    assert detail["sessions"][0]["title"] == "DBIO 계층 전환"
+    assert detail["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
+    assert detail["sessions"][0]["summary"] == "여기까지 — Service는 다음 세션에서"
+    assert detail["sessions"][0]["alive"] is False
