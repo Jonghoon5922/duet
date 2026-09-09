@@ -139,6 +139,17 @@ check("멈춘 뒤 창을 닫아도 이유가 남는다",
       [s.summary for s in core.get_task(task_id).sessions if s.title == "이어받기 검토"]
       == ["여기까지 — Service는 다음 세션에서"])
 
+# update_task: 사용자가 시켜서 제목·설명을 고친다
+fixer = Client()
+renamed = fixer.tool("update_task", {"task_id": task_id, "title": "pc101pm 전환 (1차)",
+                                    "description": "NEFSS→BXM. Service 계층은 다음 주."})
+check("update_task가 제목을 고친다", renamed["task"]["title"] == "pc101pm 전환 (1차)",
+      str(renamed["changed"]))
+check("폴더 이름은 그대로다", core.find_task(task_id).name.endswith("pc101pm-전환"),
+      core.find_task(task_id).name)
+check("설명도 함께 바뀐다", core.get_task(task_id).description.endswith("다음 주."))
+fixer.close()
+
 # 세션 C: 보고 없이 창을 닫는다 → 종료 훅이 중지로 적는다
 c = Client()
 c.tool("join_task", {"task_id": task_id, "session_title": "설계서 docx 빌드"})

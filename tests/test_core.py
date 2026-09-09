@@ -159,3 +159,17 @@ def test_상세에_다른_세션의_로그가_들어온다():
     assert detail["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
     assert detail["sessions"][0]["summary"] == "여기까지 — Service는 다음 세션에서"
     assert detail["sessions"][0]["alive"] is False
+
+
+def test_제목과_설명을_고쳐도_폴더와_상태는_그대로다():
+    task = core.create_task("옛 제목", "옛 설명")
+    core.set_status(task.id, core.WAITING)  # 사람이 정해 둔 상태
+
+    after = core.update_task(task.id, title="새 제목")
+    assert (after.title, after.description) == ("새 제목", "옛 설명"), "안 준 것은 안 바뀐다"
+    assert after.dir.name == task.dir.name, "id가 판별자다"
+    assert after.status == core.WAITING and after.override == core.WAITING
+
+    assert core.update_task(task.id, description="새 설명").description == "새 설명"
+    with pytest.raises(core.DuetError):
+        core.update_task(task.id, title="   ")

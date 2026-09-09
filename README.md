@@ -57,10 +57,11 @@ duet ui        # http://127.0.0.1:8737
 }
 ```
 
-MCP 도구: `list_tasks` · `create_task` · `join_task` · `get_task` · `report_progress` · `complete_session` · `pause_session`
+MCP 도구: `list_tasks` · `create_task` · `join_task` · `get_task` · `update_task` · `report_progress` · `complete_session` · `pause_session`
 
 `get_task`가 인수인계다 — 세션 B가 A의 진행 로그를 읽고 이어받는다.
 `pause_session`은 "여기까지"일 때. 중지된 세션이 있으면 타스크는 닫히지 않는다.
+`update_task`는 사용자가 시켜서 제목·설명·상태를 고칠 때. 폴더 이름은 그대로 둔다.
 CLI: `duet serve` · `duet ui` · `duet add` · `duet list` · `duet show` · `duet version`
 
 ```bash

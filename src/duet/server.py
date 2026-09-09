@@ -143,6 +143,38 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         return detail
 
     @server.tool(
+        name="update_task",
+        description=(
+            "타스크의 제목·설명·상태를 고친다. **사용자가 그렇게 하라고 했을 때만 쓴다** — "
+            "일이 어디까지 됐는지는 report_progress로 남기는 것이지 설명을 고쳐 적는 게 아니다. "
+            "status를 주면 사람이 정한 상태로 적혀 자동 규칙(세션을 세는 것)을 덮는다. "
+            "`자동`을 주면 그 줄을 지워 다시 세게 한다."
+        ),
+    )
+    def update_task_tool(
+        ctx: Context,
+        task_id: str,
+        title: str | None = None,
+        description: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        touch(ctx)
+        try:
+            task = core.update_task(task_id, title, description)
+            if status is not None:
+                task = core.set_status(task_id, None if status == "자동" else status)
+        except (core.DuetError, OSError) as e:
+            return {"error": str(e)}
+
+        changed = [name for name, value in
+                   (("제목", title), ("설명", description), ("상태", status)) if value is not None]
+        return {
+            "task": task.to_dict(),
+            "changed": changed or ["없음"],
+            "note": f"{task.dir.name} 폴더 이름은 그대로 둔다 — 판별자는 id다.",
+        }
+
+    @server.tool(
         name="pause_session",
         description=(
             "이 세션을 여기서 멈춘다(`중지`). 일이 끝나지 않았는데 사용자가 "

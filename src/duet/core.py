@@ -282,6 +282,24 @@ def list_tasks(status: str | None = None) -> list[Task]:
     return sorted(tasks, key=lambda t: (t.last_activity, t.id), reverse=True)
 
 
+def update_task(
+    task_id: str | int, title: str | None = None, description: str | None = None
+) -> Task:
+    """제목·설명을 고친다. **폴더 이름은 그대로 둔다** — 판별자는 앞의 id다.
+
+    사람이 정한 `상태:` 줄은 건드리지 않는다. 제목을 고치러 왔다가 상태가 풀리면
+    안 된다.
+    """
+    task = get_task(task_id)
+    new_title = task.title if title is None else title.strip()
+    if not new_title:
+        raise DuetError("타스크 제목이 비어 있다.")
+    new_description = task.description if description is None else description.strip()
+
+    _write_task(task.dir, new_title, new_description, task.override)
+    return get_task(task_id)
+
+
 def set_status(task_id: str | int, status: str | None) -> Task:
     """사람이 상태를 정한다. None을 주면 그 줄을 지워 다시 세게 한다."""
     if status is not None and status not in TASK_STATUSES:
