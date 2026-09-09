@@ -23,11 +23,8 @@ classifiers = [
 dependencies = [
     # MCP 2.x에서 FastMCP가 MCPServer로 개명됐다. 1.x가 깔리면 import부터 실패한다.
     "mcp>=2.0",
-    "pyyaml>=6.0",
     "typer>=0.15",
     "rich>=13.9",
-    "fastapi>=0.115",
-    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]

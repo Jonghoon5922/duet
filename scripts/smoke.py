@@ -1,0 +1,144 @@
+"""진짜 stdio MCP 서버 프로세스로 한 바퀴 돌려 본다.
+
+단위 테스트가 못 보는 것을 본다 — 프로세스가 뜨고, 죽고, 창이 닫힐 때 무슨 일이
+벌어지는가. 단계를 끝낼 때마다 이걸 돌린다.
+
+    uv run python scripts/smoke.py
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+PROJECT = Path(__file__).resolve().parent.parent
+HOME = Path(tempfile.mkdtemp(prefix="duet-smoke-"))
+sys.path.insert(0, str(PROJECT / "src"))
+os.environ["DUET_HOME"] = str(HOME)
+
+from duet import core  # noqa: E402
+
+
+class Client:
+    """MCP stdio 클라이언트 최소 구현. 창 하나를 흉내 낸다."""
+
+    def __init__(self, client_name: str = "claude-code"):
+        self.proc = subprocess.Popen(
+            ["uv", "run", "duet", "serve"],
+            cwd=PROJECT,
+            env=dict(os.environ, DUET_HOME=str(HOME), PYTHONIOENCODING="utf-8"),
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", bufsize=1,
+        )
+        self._id = 0
+        self.instructions = self._initialize(client_name)
+
+    def _rpc(self, method: str, params: dict, notify: bool = False) -> dict:
+        if notify:
+            self.proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": method, "params": params}) + "\n")
+            self.proc.stdin.flush()
+            return {}
+        self._id += 1
+        self.proc.stdin.write(
+            json.dumps({"jsonrpc": "2.0", "id": self._id, "method": method, "params": params}) + "\n"
+        )
+        self.proc.stdin.flush()
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                raise RuntimeError(f"서버가 응답 없이 끝났다\n{self.proc.stderr.read()}")
+            msg = json.loads(line)
+            if msg.get("id") == self._id:
+                if "error" in msg:
+                    raise RuntimeError(msg["error"])
+                return msg["result"]
+
+    def _initialize(self, client_name: str) -> str:
+        result = self._rpc("initialize", {
+            "protocolVersion": "2025-06-18", "capabilities": {},
+            "clientInfo": {"name": client_name, "version": "9.9.9"},
+        })
+        self._rpc("notifications/initialized", {}, notify=True)
+        return result.get("instructions", "")
+
+    def tool(self, name: str, args: dict | None = None) -> dict:
+        result = self._rpc("tools/call", {"name": name, "arguments": args or {}})
+        content = result.get("structuredContent")
+        return content if content is not None else json.loads(result["content"][0]["text"])
+
+    def close(self, kill: bool = False) -> None:
+        self.proc.kill() if kill else self.proc.stdin.close()
+        self.proc.wait(timeout=30)
+
+
+FAILED = False
+
+
+def check(label: str, ok: bool, detail: str = "") -> None:
+    global FAILED
+    print(f"[{'OK  ' if ok else 'FAIL'}] {label}" + (f" - {detail}" if detail else ""))
+    FAILED = FAILED or not ok
+
+
+print(f"DUET_HOME = {HOME}\n")
+
+# 세션 A: 타스크를 만들고 참여한다
+a = Client()
+check("A 연결, instructions에 안내가 있다", "join_task" in a.instructions)
+task_id = a.tool("create_task", {"title": "pc101pm 전환", "description": "NEFSS→BXM"})["task"]["id"]
+md_before = (core.find_task(task_id) / "task.md").read_text(encoding="utf-8")
+
+joined = a.tool("join_task", {"task_id": task_id, "session_title": "DBIO 계층 전환"})
+check("A join → 타스크 진행중", joined["task"]["status"] == "진행중", str(joined["task"]["sessions"]))
+a.tool("report_progress", {"message": "DBIO 12개 중 5개 전환", "percent": 40})
+
+# 세션 B: 같은 타스크에 붙는다
+b = Client("claude-ai")
+check("B의 instructions에 열린 타스크가 보인다", f"[{task_id}] pc101pm 전환" in b.instructions,
+      [ln for ln in b.instructions.splitlines() if ln.startswith(f"- [{task_id}]")][0])
+b.tool("join_task", {"task_id": task_id, "session_title": "Bean 계층 전환"})
+b.tool("report_progress", {"message": "Bean 8개 전환", "percent": 80})
+
+check("세션 2개가 각자 클라이언트 이름으로 붙었다",
+      [s.client for s in core.get_task(task_id).sessions] == ["Claude Code", "Claude Desktop"])
+check("세션이 붙고 보고해도 task.md는 그대로다 (충돌 없음)",
+      (core.find_task(task_id) / "task.md").read_text(encoding="utf-8") == md_before)
+
+# 둘 다 끝내면 타스크가 닫힌다
+check("A 완료 → 타스크는 아직 진행중",
+      a.tool("complete_session", {"summary": "DBIO 끝"})["task"]["status"] == "진행중")
+done = b.tool("complete_session", {"summary": "Bean 끝"})
+check("B 완료 → 타스크 자동 완료", done["task"]["status"] == "완료", done.get("note", ""))
+
+a.close()
+b.close()
+check("창을 닫아도 완료 세션은 완료로 남는다",
+      [s.status for s in core.get_task(task_id).sessions] == ["완료", "완료"])
+
+# 세션 C: 보고 없이 창을 닫는다 → 종료 훅이 중지로 적는다
+c = Client()
+c.tool("join_task", {"task_id": task_id, "session_title": "설계서 docx 빌드"})
+check("완료된 타스크에 새 세션이 붙으면 다시 진행중", core.get_task(task_id).status == "진행중")
+c.close()
+time.sleep(0.5)
+stopped = [s for s in core.get_task(task_id).sessions if s.title == "설계서 docx 빌드"][0]
+check("보고 없이 닫힌 세션은 중지", stopped.status == "중지", stopped.summary)
+check("중지가 섞이면 타스크는 열린 채로 남는다", core.get_task(task_id).status == "진행중",
+      core.get_task(task_id).warning)
+
+# 사람이 정한 상태가 이긴다
+core.set_status(task_id, "완료")
+d = Client()
+d.tool("join_task", {"task_id": task_id, "session_title": "잠긴 타스크에 붙는 세션"})
+check("사람이 정한 상태는 세션이 붙어도 안 바뀐다", core.get_task(task_id).status == "완료")
+d.close()
+check("그 줄을 지우면 다시 센다", core.set_status(task_id, None).status == "진행중")
+
+print()
+print("실패 있음" if FAILED else "전부 통과")
+sys.exit(1 if FAILED else 0)
