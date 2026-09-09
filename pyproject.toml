@@ -25,6 +25,9 @@ dependencies = [
     "mcp>=2.0",
     "typer>=0.15",
     "rich>=13.9",
+    "fastapi>=0.115",
+    # `duet ui`가 직접 부른다. mcp를 통해 딸려오지만 우리 코드가 쓰므로 명시한다.
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +46,7 @@ duet = "duet.cli:app"
 duet-mcp = "duet.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8.3"]
+dev = ["pytest>=8.3", "httpx>=0.27"]  # httpx는 fastapi TestClient가 쓴다
 
 # 버전은 src/duet/__init__.py 한 곳에만 있다. 여기서 읽으므로 어긋날 수 없다.
 [tool.hatch.version]

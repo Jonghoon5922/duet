@@ -31,6 +31,18 @@ DB가 없다. 한 파일에 두 주인이 없어서 락도 없다 — 세션 파
 세션은 30초마다 하트비트를 찍는다. 창을 닫으면 종료 훅이 `중지`로 적고,
 훅조차 못 돌면(크래시·강제 종료) 하트비트 90초 초과를 읽는 쪽이 잡는다.
 
+## 대시보드
+
+```bash
+duet ui        # http://127.0.0.1:8737
+```
+
+왼쪽에 타스크 카드(상태 배지·세션 점·마지막 활동), 오른쪽에 세션과 진행 로그 타임라인.
+요청이 올 때마다 폴더를 다시 읽으므로, 탐색기에서 `task.md`를 고쳐도 2초 안에 화면에 뜬다.
+드롭다운으로 상태를 정하면 그 `상태:` 줄을 대신 써 준다 — 화면과 파일이 같은 것을 본다.
+
+파일 감시(watchdog) + SSE는 아직이다. 지금은 2초마다 다시 물어본다.
+
 ## 쓰기
 
 ```json
@@ -46,7 +58,7 @@ DB가 없다. 한 파일에 두 주인이 없어서 락도 없다 — 세션 파
 ```
 
 MCP 도구: `list_tasks` · `create_task` · `join_task` · `report_progress` · `complete_session`
-CLI: `duet serve` · `duet add` · `duet list` · `duet show` · `duet version`
+CLI: `duet serve` · `duet ui` · `duet add` · `duet list` · `duet show` · `duet version`
 
 ```bash
 uv run pytest && uv run python scripts/smoke.py

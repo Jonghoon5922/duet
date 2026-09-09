@@ -123,3 +123,15 @@ def show(task_id: str = typer.Argument(..., help="타스크 id (T001 또는 1)")
 def version() -> None:
     """버전과 저장 위치."""
     console.print(f"Duet {__version__}  [dim]{core.home()}[/dim]")
+
+
+@app.command()
+def ui(
+    port: int = typer.Option(8737, "--port", "-p"),
+    no_open: bool = typer.Option(False, "--no-open", help="브라우저를 열지 않는다"),
+) -> None:
+    """대시보드. 127.0.0.1에서만 듣는다."""
+    from .web import DEFAULT_HOST, serve_ui
+
+    console.print(f"[dim]http://{DEFAULT_HOST}:{port}  ({core.home()})[/dim]")
+    serve_ui(port=port, open_browser=not no_open)

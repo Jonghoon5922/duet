@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duet</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #fff; --line: #e3e3df; --ink: #23231f; --dim: #77776e;
+    --대기: #9a9a90; --진행중: #2f7fd0; --완료: #2e9c62; --중지: #c98a12; --취소: #c05252;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17171a; --panel: #1f1f23; --line: #33333a; --ink: #e8e8e4; --dim: #96968c;
+      --진행중: #67a9e8; --완료: #56c186; --중지: #e0ab3d; --취소: #e07b7b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.6 "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0; font-size: 16px; letter-spacing: .02em; }
+  header .home { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; }
+  #filters { margin-left: auto; display: flex; gap: 6px; }
+  #filters button {
+    border: 1px solid var(--line); background: var(--panel); color: var(--dim);
+    border-radius: 999px; padding: 3px 11px; font-size: 12px; cursor: pointer;
+  }
+  #filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--dim); }
+
+  main { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+
+  .card, .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  }
+  #tasks { display: flex; flex-direction: column; gap: 8px; }
+  .card { cursor: pointer; }
+  .card[aria-selected="true"] { border-color: var(--진행중); }
+  .card h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+  .meta { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 12px; }
+
+  .badge {
+    font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    border: 1px solid currentColor; white-space: nowrap;
+  }
+  .대기 { color: var(--대기); } .진행중 { color: var(--진행중); }
+  .완료 { color: var(--완료); } .중지 { color: var(--중지); } .취소 { color: var(--취소); }
+  .lock { color: var(--dim); }
+  .warn { color: var(--중지); }
+
+  .dots { display: inline-flex; gap: 3px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .dot.hollow { background: none; border: 1px solid currentColor; }
+
+  .panel h2 { margin: 0; font-size: 16px; }
+  .desc { color: var(--dim); white-space: pre-wrap; margin: 8px 0 0; }
+  .folder { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; margin-top: 6px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+  .hint { color: var(--dim); font-size: 12px; }
+
+  .session { border-top: 1px solid var(--line); padding: 12px 0 4px; }
+  .session:first-of-type { border-top: none; }
+  .session .who { color: var(--dim); font-size: 12px; }
+  .log { margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
+  .log li { list-style: none; margin-bottom: 4px; }
+  .log time { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; margin-right: 6px; }
+  .summary { margin-top: 6px; }  /* 색은 세션 상태를 따른다 — 중지된 세션의 마지막 말이 초록일 이유가 없다 */
+  .empty { color: var(--dim); padding: 8px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Duet</h1>
+  <span class="home" id="home"></span>
+  <nav id="filters"></nav>
+</header>
+
+<main>
+  <section id="tasks" aria-label="타스크"></section>
+  <section class="panel" id="detail"><p class="empty">타스크를 고르면 세션과 진행 로그가 여기 나온다.</p></section>
+</main>
+
+<script>
+const STATUSES = ["전체", "대기", "진행중", "완료", "중지", "취소"];
+let filter = "전체";
+let selected = null;
+// 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
+const drawn = { filters: null, list: null, detail: null };
+
+const api = async (path, options) => {
+  const res = await fetch(path, options);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
+};
+// null인 자식은 버리고 배열은 펴서 넣는다. replaceChildren에 그냥 넘기면
+// null이 "null" 글자로, 배열이 [object HTMLDivElement]로 찍힌다.
+const put = (node, kids) => {
+  node.replaceChildren(...kids.flat(2).filter((kid) => kid != null));
+  return node;
+};
+const el = (tag, props = {}, ...kids) => {
+  const node = Object.assign(document.createElement(tag), props);
+  for (const kid of kids.flat(2)) if (kid != null) node.append(kid);
+  return node;
+};
+const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) : "";
+
+function badge(status) {
+  return el("span", { className: `badge ${status}`, textContent: status });
+}
+
+// 세션 칸: 진행중은 채운 점, 끝난 것은 빈 점. 숫자보다 한눈에 들어온다.
+function dots(counts) {
+  const wrap = el("span", { className: "dots" });
+  const add = (n, cls, hollow) => {
+    for (let i = 0; i < n; i++) wrap.append(el("span", { className: `dot ${cls}${hollow ? " hollow" : ""}` }));
+  };
+  add(counts["진행중"], "진행중", false);
+  add(counts["완료"], "완료", true);
+  add(counts["중지"], "중지", true);
+  return wrap;
+}
+
+function renderFilters() {
+  if (drawn.filters === filter) return;
+  drawn.filters = filter;
+  const nav = document.getElementById("filters");
+  put(nav, STATUSES.map((s) => {
+    const button = el("button", { type: "button", textContent: s });
+    button.setAttribute("aria-pressed", String(s === filter));
+    button.onclick = () => { filter = s; refresh(); };
+    return button;
+  }));
+}
+
+function renderTasks(tasks) {
+  const list = document.getElementById("tasks");
+  const shape = JSON.stringify([tasks, filter, selected]);
+  if (shape === drawn.list) return;
+  drawn.list = shape;
+
+  if (!tasks.length) {
+    put(list, [el("p", { className: "empty", textContent: "타스크가 없다. `duet add <제목>` 으로 만든다." })]);
+    return;
+  }
+  put(list, tasks.map((t) => {
+    const meta = el("div", { className: "meta" }, badge(t.status),
+      t.override ? el("span", { className: "lock", textContent: "🔒 사람이 정함" }) : null,
+      dots(t.counts),
+      t.warning ? el("span", { className: "warn", title: t.warning, textContent: "⚠" }) : null,
+      el("span", { style: "margin-left:auto", textContent: when(t.last_activity) }));
+
+    const card = el("div", { className: "card" }, el("h2", { textContent: `${t.id}  ${t.title}` }), meta);
+    card.setAttribute("aria-selected", String(t.id === selected));
+    card.onclick = () => { selected = t.id; refresh(); };
+    return card;
+  }));
+}
+
+function renderSession(s) {
+  const logs = s.progress.map((p) => el("li", {},
+    el("time", { textContent: when(p.t) }),
+    p.msg + (p.pct != null ? ` (${p.pct}%)` : "")));
+
+  return el("div", { className: "session" },
+    el("div", { className: "row" },
+      el("strong", { textContent: s.title || s.id }),
+      badge(s.status),
+      el("span", { className: "who", textContent: s.alive ? `${s.client} · 살아 있음` : s.client })),
+    logs.length ? el("ul", { className: "log" }, logs) : el("p", { className: "empty", textContent: "보고 없음" }),
+    s.summary ? el("p", { className: `summary ${s.status}`, textContent: `→ ${s.summary}` }) : null);
+}
+
+async function renderDetail(taskId) {
+  const panel = document.getElementById("detail");
+  if (!taskId) return;
+  const t = await api(`/api/tasks/${taskId}`);
+
+  // 바뀐 게 없으면 그리지 않는다. 2초마다 통째로 다시 그리면 드롭다운을 여는 중에
+  // 그것이 사라진다.
+  const shape = JSON.stringify(t);
+  if (shape === drawn.detail) return;
+  drawn.detail = shape;
+
+  const picker = el("select");
+  picker.append(el("option", { value: "", textContent: "자동 (세션에서 셈)" }));
+  for (const s of STATUSES.slice(1)) {
+    picker.append(el("option", { value: s, textContent: `사람이 정함: ${s}`, selected: t.override === s }));
+  }
+  picker.onchange = async () => {
+    await api(`/api/tasks/${taskId}/status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: picker.value || null }),
+    });
+    drawn.detail = null;  // 방금 바꿨으니 다시 그린다
+    refresh();
+  };
+
+  put(panel, [
+    el("div", { className: "row" }, el("h2", { textContent: `${t.id}  ${t.title}` }), badge(t.status)),
+    t.description ? el("p", { className: "desc", textContent: t.description }) : null,
+    t.warning ? el("p", { className: "warn", textContent: `⚠ ${t.warning}` }) : null,
+    el("p", { className: "folder", textContent: t.folder }),
+    el("div", { className: "row", style: "margin:12px 0" }, picker,
+      el("span", { className: "hint", textContent: "사람이 정한 상태가 자동 규칙을 덮는다. `task.md`의 `상태:` 줄이 그것이다." })),
+    t.sessions.length ? t.sessions.map(renderSession)
+      : el("p", { className: "empty", textContent: "참여한 세션이 없다." })]);
+}
+
+async function refresh() {
+  try {
+    const data = await api("/api/tasks" + (filter === "전체" ? "" : `?status=${encodeURIComponent(filter)}`));
+    document.getElementById("home").textContent = data.home;
+    renderFilters();
+    renderTasks(data.tasks);
+    if (selected && !data.tasks.some((t) => t.id === selected) && filter === "전체") selected = null;
+    await renderDetail(selected);
+  } catch (e) {
+    put(document.getElementById("tasks"), [
+      el("p", { className: "warn", textContent: `읽지 못했다: ${e.message}` })]);
+  }
+}
+
+refresh();
+// 폴더를 다시 읽을 뿐이라 싸다. 파일 감시 + SSE는 뒤 단계에서.
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
