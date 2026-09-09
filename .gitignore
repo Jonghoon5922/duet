@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# (DB 없음 — 저장은 ~/.duet/ 아래 파일)
+
+# OS / 에디터
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
+launch.json

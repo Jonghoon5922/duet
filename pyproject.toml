@@ -1,0 +1,66 @@
+[project]
+name = "duet-mcp"
+dynamic = ["version"]
+description = "타스크 하나에 Claude 세션 여러 개를 묶어 진행을 보고받는 개인용 로컬 PMS MCP 서버 (DB 없이 파일만)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jonghoon5922" }]
+keywords = ["mcp", "pms", "task", "session", "local", "claude", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: Korean",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+]
+dependencies = [
+    # MCP 2.x에서 FastMCP가 MCPServer로 개명됐다. 1.x가 깔리면 import부터 실패한다.
+    "mcp>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.15",
+    "rich>=13.9",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+# 데스크톱 앱 창. MCP 서버로만 쓸 때는 필요 없어서 기본에서 뺀다.
+app = ["pywebview>=5.0"]
+
+[project.urls]
+Homepage = "https://github.com/Jonghoon5922/duet"
+Repository = "https://github.com/Jonghoon5922/duet"
+Issues = "https://github.com/Jonghoon5922/duet/issues"
+
+[project.scripts]
+duet = "duet.cli:app"
+# uvx는 패키지 이름과 같은 명령을 찾는다. 이 별칭이 있어야
+# `uvx duet-mcp serve` 가 --from 없이 바로 된다.
+duet-mcp = "duet.cli:app"
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+# 버전은 src/duet/__init__.py 한 곳에만 있다. 여기서 읽으므로 어긋날 수 없다.
+[tool.hatch.version]
+path = "src/duet/__init__.py"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/duet"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/duet", "tests", "README.md", "SPEC.md", "LICENSE", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

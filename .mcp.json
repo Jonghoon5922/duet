@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "duet": {
+      "command": "uv",
+      "args": ["run", "duet", "serve"],
+      "cwd": "C:/project/duet"
+    }
+  }
+}
