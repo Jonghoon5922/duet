@@ -66,3 +66,35 @@ def test_없는_타스크와_모르는_상태는_거부한다(client):
     task = core.create_task("전환")
     assert client.get("/api/tasks/T999").status_code == 404
     assert client.post(f"/api/tasks/{task.id}/status", json={"status": "아무거나"}).status_code == 400
+
+
+def test_화면에서_타스크를_만든다(client):
+    body = client.post("/api/tasks", json={"title": "pc101pm 전환", "description": "NEFSS→BXM"}).json()
+    assert body["id"] == "T001"
+    assert body["status"] == core.WAITING
+    assert core.get_task("T001").description == "NEFSS→BXM"
+
+    assert client.post("/api/tasks", json={"title": "  "}).status_code == 400
+
+
+def test_제목과_설명을_인라인으로_고친다(client):
+    task = core.create_task("옛 제목", "옛 설명")
+    core.set_status(task.id, core.WAITING)  # 사람이 정해 둔 상태
+
+    body = client.patch(f"/api/tasks/{task.id}", json={"title": "새 제목"}).json()
+    assert body["title"] == "새 제목"
+    assert body["description"] == "옛 설명", "안 준 것은 안 바뀐다"
+    assert body["override"] == core.WAITING, "상태는 건드리지 않는다"
+
+    assert client.patch(f"/api/tasks/{task.id}", json={"title": ""}).status_code == 400
+
+
+def test_목록에_세션과_로그가_함께_온다(client):
+    task = core.create_task("전환")
+    s = core.register_session("Claude Code")
+    core.join(s, task.id, "DBIO 계층 전환")
+    core.report(s, "설계서 훑음", 30)
+
+    row = client.get("/api/tasks").json()["tasks"][0]
+    assert row["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
+    assert row["folder"].endswith(task.dir.name)

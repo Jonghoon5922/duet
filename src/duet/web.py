@@ -30,6 +30,17 @@ class StatusIn(BaseModel):
     status: str | None = None
 
 
+class TaskIn(BaseModel):
+    title: str
+    description: str = ""
+
+
+class EditIn(BaseModel):
+    #: 준 것만 바뀐다. None은 "안 건드림"이다.
+    title: str | None = None
+    description: str | None = None
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Duet", version=__version__, docs_url=None, redoc_url=None)
 
@@ -40,8 +51,29 @@ def create_app() -> FastAPI:
 
     @app.get("/api/tasks")
     def tasks(status: str | None = None) -> dict[str, Any]:
-        rows = [t.to_dict() for t in core.list_tasks(status)]
+        # 카드가 세션 줄까지 그리므로 상세째로 준다. 어차피 list_tasks가 세션 파일을
+        # 이미 읽었다 — 개인용 규모에서 2초마다 이걸 보내도 무겁지 않다.
+        rows = [t.to_detail() for t in core.list_tasks(status)]
         return {"tasks": rows, "statuses": list(core.TASK_STATUSES), "home": str(core.home())}
+
+    @app.post("/api/tasks", status_code=201)
+    def new_task(body: TaskIn) -> dict[str, Any]:
+        try:
+            return core.create_task(body.title, body.description).to_detail()
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.patch("/api/tasks/{task_id}")
+    def edit_task(task_id: str, body: EditIn) -> dict[str, Any]:
+        """제목·설명 인라인 편집. 사람이 정한 상태는 건드리지 않는다."""
+        try:
+            return core.update_task(task_id, body.title, body.description).to_detail()
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/api/tasks/{task_id}")
     def task(task_id: str) -> dict[str, Any]:

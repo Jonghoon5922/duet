@@ -3,108 +3,199 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duet</title>
+<title>Duet — 세션 보드</title>
 <style>
-  :root {
-    --bg: #f7f7f5; --panel: #fff; --line: #e3e3df; --ink: #23231f; --dim: #77776e;
-    --대기: #9a9a90; --진행중: #2f7fd0; --완료: #2e9c62; --중지: #c98a12; --취소: #c05252;
+/* 웹폰트를 불러오지 않는다. 네트워크를 쓰지 않는 것이 이 도구의 원칙이라
+   설치돼 있는 글꼴만 쓴다 (Pretendard가 있으면 그것, 없으면 맑은 고딕). */
+:root{
+  --bg:#F3F4F7; --panel:#fff; --panel-2:#F8F9FB; --line:#DCDFE6; --line-2:#EBEDF2;
+  --ink:#171A21; --ink-2:#4C5261; --ink-3:#8A90A0;
+  --accent:#1F4E8C; --accent-ink:#fff;
+  --진행중:#2563B8; --진행중-bg:#E3ECFA;
+  --대기:#B7791F;   --대기-bg:#FBF0DA;
+  --중지:#6B7280;   --중지-bg:#ECEEF2;
+  --완료:#1E7F4F;   --완료-bg:#DDF2E6;
+  --취소:#B42318;   --취소-bg:#FBE9E7;
+  --shadow:0 1px 2px rgba(23,26,33,.06), 0 4px 14px rgba(23,26,33,.06);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#13161B; --panel:#1B1F26; --panel-2:#20252D; --line:#2E343E; --line-2:#272C35;
+    --ink:#ECEEF2; --ink-2:#AEB4C0; --ink-3:#737A88;
+    --accent:#7FA6E8; --accent-ink:#0F172A;
+    --진행중:#7FA6E8; --진행중-bg:#1C2A40;
+    --대기:#E2B25C;   --대기-bg:#3A2E15;
+    --중지:#A0A6B3;   --중지-bg:#2A2F38;
+    --완료:#5FC98F;   --완료-bg:#16321F;
+    --취소:#F08A80;   --취소-bg:#3A1E1B;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #17171a; --panel: #1f1f23; --line: #33333a; --ink: #e8e8e4; --dim: #96968c;
-      --진행중: #67a9e8; --완료: #56c186; --중지: #e0ab3d; --취소: #e07b7b;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 14px/1.6 "Pretendard", "Malgun Gothic", system-ui, sans-serif;
-  }
-  header {
-    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-    padding: 14px 20px; border-bottom: 1px solid var(--line);
-  }
-  header h1 { margin: 0; font-size: 16px; letter-spacing: .02em; }
-  header .home { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; }
-  #filters { margin-left: auto; display: flex; gap: 6px; }
-  #filters button {
-    border: 1px solid var(--line); background: var(--panel); color: var(--dim);
-    border-radius: 999px; padding: 3px 11px; font-size: 12px; cursor: pointer;
-  }
-  #filters button[aria-pressed="true"] { color: var(--ink); border-color: var(--dim); }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-  main { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 16px; padding: 16px 20px; }
-  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--ink-3);font-size:12.5px;margin-top:2px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--중지);display:inline-block}
+.pulse.on{background:var(--완료)}
 
-  .card, .panel {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
-  }
-  #tasks { display: flex; flex-direction: column; gap: 8px; }
-  .card { cursor: pointer; }
-  .card[aria-selected="true"] { border-color: var(--진행중); }
-  .card h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
-  .meta { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 12px; }
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;font-weight:500;font-size:13px}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
 
-  .badge {
-    font-size: 11px; padding: 1px 8px; border-radius: 999px;
-    border: 1px solid currentColor; white-space: nowrap;
-  }
-  .대기 { color: var(--대기); } .진행중 { color: var(--진행중); }
-  .완료 { color: var(--완료); } .중지 { color: var(--중지); } .취소 { color: var(--취소); }
-  .lock { color: var(--dim); }
-  .warn { color: var(--중지); }
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);padding:12px 14px 12px 18px;
+      display:flex;flex-direction:column;gap:2px;text-align:left;position:relative}
+.stat .bar{position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px}
+.stat .k{font-size:12px;color:var(--ink-2);font-weight:500}
+.stat .v{font-size:26px;font-weight:600;line-height:1.1}
+.stat .s{font-size:11.5px;color:var(--ink-3)}
+.stat[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 
-  .dots { display: inline-flex; gap: 3px; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .dot.hollow { background: none; border: 1px solid currentColor; }
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--ink-2);
+      display:inline-flex;gap:6px;align-items:center}
+.chip .n{color:var(--ink-3)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.7}
+.spacer{flex:1}
+.search{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;min-width:220px}
 
-  .panel h2 { margin: 0; font-size: 16px; }
-  .desc { color: var(--dim); white-space: pre-wrap; margin: 8px 0 0; }
-  .folder { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; margin-top: 6px; }
-  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
-  .hint { color: var(--dim); font-size: 12px; }
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.task{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);
+      display:flex;flex-direction:column;overflow:hidden}
+.task.s-완료{opacity:.82}
+.head{padding:14px 16px 8px;display:flex;gap:10px;align-items:flex-start}
+.stripe{width:4px;align-self:stretch;border-radius:2px;flex:none;margin-top:2px}
+.title{font-weight:600;font-size:15px;line-height:1.35;flex:1;min-width:0;overflow-wrap:break-word;word-break:keep-all;border-radius:4px;padding:0 3px;margin:0 -3px}
+.title:hover{background:var(--panel-2)}
+.tid{color:var(--ink-3);font-weight:500;font-size:13px;padding-top:1px;flex:none}
+.desc{padding:0 16px 10px 30px}
+.desc div{color:var(--ink-2);font-size:12.5px;white-space:pre-wrap;border-radius:4px;padding:0 3px;margin:0 -3px}
+.desc div:hover{background:var(--panel-2)}
+.desc div:empty::before{content:"설명 없음";color:var(--ink-3)}
+.meta{padding:0 16px 12px 30px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
+.progress{height:4px;background:var(--line-2);border-radius:2px;flex:1;min-width:70px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--완료);border-radius:2px;transition:width .25s}
+.warn{padding:0 16px 12px 30px;color:var(--대기);font-size:12.5px}
 
-  .session { border-top: 1px solid var(--line); padding: 12px 0 4px; }
-  .session:first-of-type { border-top: none; }
-  .session .who { color: var(--dim); font-size: 12px; }
-  .log { margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); }
-  .log li { list-style: none; margin-bottom: 4px; }
-  .log time { color: var(--dim); font-size: 12px; font-family: ui-monospace, monospace; margin-right: 6px; }
-  .summary { margin-top: 6px; }  /* 색은 세션 상태를 따른다 — 중지된 세션의 마지막 말이 초록일 이유가 없다 */
-  .empty { color: var(--dim); padding: 8px 0; }
+.sel{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 24px 4px 8px;font-size:12.5px;
+     font-weight:500;appearance:none;-webkit-appearance:none;
+     background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+     background-position:calc(100% - 12px) 55%, calc(100% - 8px) 55%;background-size:4px 4px;background-repeat:no-repeat}
+.sel.s-진행중{color:var(--진행중);background-color:var(--진행중-bg);border-color:transparent}
+.sel.s-대기{color:var(--대기);background-color:var(--대기-bg);border-color:transparent}
+.sel.s-중지{color:var(--중지);background-color:var(--중지-bg);border-color:transparent}
+.sel.s-완료{color:var(--완료);background-color:var(--완료-bg);border-color:transparent}
+.sel.s-취소{color:var(--취소);background-color:var(--취소-bg);border-color:transparent}
+
+.sessions{border-top:1px solid var(--line-2)}
+.sess{border-bottom:1px solid var(--line-2)}
+.sess:last-child{border-bottom:0}
+.sess summary{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:8px 12px 8px 16px;list-style:none}
+.sess summary::-webkit-details-marker{display:none}
+.sess summary:hover{background:var(--panel-2)}
+.sd{width:8px;height:8px;border-radius:50%;justify-self:center;background:var(--중지)}
+.sess.s-진행중 .sd{background:var(--진행중);box-shadow:0 0 0 3px var(--진행중-bg)}
+.sess.s-완료 .sd{background:var(--완료)}
+.nm{min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.nm b{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nm span{font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess.s-완료 .nm b{color:var(--ink-3)}
+.tag{font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.tag.s-진행중{color:var(--진행중);background:var(--진행중-bg)}
+.tag.s-완료{color:var(--완료);background:var(--완료-bg)}
+.tag.s-중지{color:var(--중지);background:var(--중지-bg)}
+.log{margin:0;padding:0 14px 12px 38px;list-style:none}
+.log li{display:flex;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:3px}
+.log time{color:var(--ink-3);font-size:11.5px;flex:none;padding-top:1px}
+.log .none{color:var(--ink-3)}
+.foot{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 14px 7px 16px;
+      border-top:1px solid var(--line-2);font-size:11.5px;color:var(--ink-3)}
+.foot .path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%}
+.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--ink-3);border:1px dashed var(--line);border-radius:var(--radius)}
+.hint{font-size:11.5px;color:var(--ink-3);margin-top:14px;line-height:1.7}
+
+dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;padding:0;width:min(520px,92vw);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,12,16,.45)}
+dialog form{padding:20px}
+dialog h2{margin:0 0 14px;font-size:16px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field label{font-size:12px;color:var(--ink-2);font-weight:500}
+.field input,.field textarea{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px}
+.field textarea{min-height:80px;resize:vertical}
+.actions{display:flex;justify-content:flex-end;gap:8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+       padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.wrap{padding:18px 14px 60px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<header>
-  <h1>Duet</h1>
-  <span class="home" id="home"></span>
-  <nav id="filters"></nav>
-</header>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>세션 보드</h1>
+      <div class="sub">
+        <span><span class="pulse" id="pulse"></span> <span id="state">읽는 중</span></span>
+        <span>·</span><span class="mono" id="home"></span>
+        <span>·</span><span>세션이 전부 완료되면 타스크도 완료</span>
+      </div>
+    </div>
+    <button class="btn primary" id="new">+ 새 타스크</button>
+  </header>
 
-<main>
-  <section id="tasks" aria-label="타스크"></section>
-  <section class="panel" id="detail"><p class="empty">타스크를 고르면 세션과 진행 로그가 여기 나온다.</p></section>
-</main>
+  <div class="stats" id="stats"></div>
+
+  <div class="toolbar">
+    <div class="chips" id="chips"></div>
+    <div class="spacer"></div>
+    <input class="search" id="q" type="search" placeholder="타스크·세션·로그 검색">
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <p class="hint">
+    제목과 설명은 클릭해서 고친다. 상태를 <b>사람이 정함</b>으로 두면 세션을 세는 자동 규칙보다 앞선다 —
+    <code>task.md</code>의 <code>상태:</code> 줄이 그것이고, <b>자동</b>으로 되돌리면 그 줄이 지워진다.<br>
+    세션 줄은 사람이 만들지 않는다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓는다. 세션을 눌러 펼치면 그 로그가 나온다.
+  </p>
+</div>
+
+<dialog id="dlg">
+  <form id="frm">
+    <h2>새 타스크</h2>
+    <div class="field"><label for="fTitle">제목</label><input id="fTitle" required placeholder="예: pc101pm 전환"></div>
+    <div class="field"><label for="fDesc">설명 (선택)</label><textarea id="fDesc" placeholder="무엇을 하는 일인지 한두 줄"></textarea></div>
+    <div class="actions">
+      <button type="button" class="btn" id="fCancel">취소</button>
+      <button type="submit" class="btn primary">만들기</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast"></div>
 
 <script>
-const STATUSES = ["전체", "대기", "진행중", "완료", "중지", "취소"];
+const STATUSES = ["대기", "진행중", "완료", "중지", "취소"];
+let tasks = [];
 let filter = "전체";
-let selected = null;
-// 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
-const drawn = { filters: null, list: null, detail: null };
+let query = "";
+let drawn = null;   // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
+const opened = new Set();  // 펼쳐 둔 세션 id
 
-const api = async (path, options) => {
-  const res = await fetch(path, options);
-  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
-  return res.json();
-};
-// null인 자식은 버리고 배열은 펴서 넣는다. replaceChildren에 그냥 넘기면
-// null이 "null" 글자로, 배열이 [object HTMLDivElement]로 찍힌다.
-const put = (node, kids) => {
-  node.replaceChildren(...kids.flat(2).filter((kid) => kid != null));
-  return node;
-};
+const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => {
   const node = Object.assign(document.createElement(tag), props);
   for (const kid of kids.flat(2)) if (kid != null) node.append(kid);
@@ -112,122 +203,222 @@ const el = (tag, props = {}, ...kids) => {
 };
 const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) : "";
 
-function badge(status) {
-  return el("span", { className: `badge ${status}`, textContent: status });
+async function api(path, options) {
+  const res = await fetch(path, options);
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+  return res.json();
 }
 
-// 세션 칸: 진행중은 채운 점, 끝난 것은 빈 점. 숫자보다 한눈에 들어온다.
-function dots(counts) {
-  const wrap = el("span", { className: "dots" });
-  const add = (n, cls, hollow) => {
-    for (let i = 0; i < n; i++) wrap.append(el("span", { className: `dot ${cls}${hollow ? " hollow" : ""}` }));
+let toastTimer;
+function toast(message) {
+  const node = $("#toast");
+  node.textContent = message;
+  node.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => node.classList.remove("show"), 2600);
+}
+
+/* ---------- 카드 ---------- */
+
+function statusSelect(task) {
+  const sel = el("select", { className: `sel s-${task.status}`, title: "사람이 정한 상태가 자동 규칙을 덮는다" });
+  sel.append(el("option", { value: "", textContent: "자동" }));
+  for (const s of STATUSES) {
+    sel.append(el("option", { value: s, textContent: `사람이 정함: ${s}`, selected: task.override === s }));
+  }
+  sel.onchange = async () => {
+    try {
+      await api(`/api/tasks/${task.id}/status`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: sel.value || null }),
+      });
+      toast(sel.value ? `${task.id} → 사람이 정함: ${sel.value}` : `${task.id} → 다시 자동 판정`);
+      refresh(true);
+    } catch (e) { toast(e.message); }
   };
-  add(counts["진행중"], "진행중", false);
-  add(counts["완료"], "완료", true);
-  add(counts["중지"], "중지", true);
-  return wrap;
+  return sel;
 }
 
-function renderFilters() {
-  if (drawn.filters === filter) return;
-  drawn.filters = filter;
-  const nav = document.getElementById("filters");
-  put(nav, STATUSES.map((s) => {
-    const button = el("button", { type: "button", textContent: s });
-    button.setAttribute("aria-pressed", String(s === filter));
-    button.onclick = () => { filter = s; refresh(); };
+// 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
+function editable(task, field, text, className) {
+  const node = el("div", { className, contentEditable: "true", spellcheck: false, textContent: text });
+  node.dataset.editing = "";
+  node.onfocus = () => { node.dataset.editing = "1"; };
+  node.onkeydown = (e) => {
+    if (e.key === "Enter" && field === "title") { e.preventDefault(); node.blur(); }
+    if (e.key === "Escape") { node.textContent = text; node.blur(); }
+  };
+  node.onblur = async () => {
+    node.dataset.editing = "";
+    const value = node.textContent.trim();
+    if (value === text) return;
+    if (field === "title" && !value) { node.textContent = text; return; }
+    try {
+      await api(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      toast(`${task.id} ${field === "title" ? "제목" : "설명"}을 고쳤다`);
+      refresh(true);
+    } catch (e) { toast(e.message); node.textContent = text; }
+  };
+  return node;
+}
+
+function sessionRow(s) {
+  const logs = s.progress.map((p) => el("li", {},
+    el("time", { className: "mono", textContent: when(p.t) }),
+    el("span", { textContent: p.msg + (p.pct != null ? ` (${p.pct}%)` : "") })));
+  if (s.summary) {
+    logs.push(el("li", {},
+      el("time", { className: "mono", textContent: "→" }),
+      el("span", { style: `color:var(--${s.status})`, textContent: s.summary })));
+  }
+
+  // 펼쳐 둔 세션은 다시 그려도 펼쳐진 채로. 살아 있는 세션은 30초마다 하트비트를
+  // 쓰므로, 기억해 두지 않으면 로그를 읽는 중에 접힌다.
+  const row = el("details", { className: `sess s-${s.status}`, open: opened.has(s.id) },
+    el("summary", {},
+      el("span", { className: "sd" }),
+      el("span", { className: "nm" },
+        el("b", { textContent: s.title || s.id }),
+        el("span", { textContent: `${s.client} · ${s.alive ? "살아 있음" : when(s.heartbeat)}` })),
+      el("span", { className: `tag s-${s.status}`, textContent: s.status })),
+    el("ul", { className: "log" },
+      logs.length ? logs : el("li", { className: "none" }, "아직 보고가 없다")));
+  row.ontoggle = () => { row.open ? opened.add(s.id) : opened.delete(s.id); };
+  return row;
+}
+
+function card(task) {
+  const total = task.sessions.length;
+  const done = task.counts["완료"];
+  const pct = total ? Math.round(100 * done / total) : 0;
+
+  // id는 편집 칸 밖에 둔다. 안에 넣으면 제목을 고칠 때 그 글자까지 같이 보내게 된다.
+  return el("article", { className: `task s-${task.status}` },
+    el("div", { className: "head" },
+      el("span", { className: "stripe", style: `background:var(--${task.status})` }),
+      el("span", { className: "tid mono", textContent: task.id }),
+      editable(task, "title", task.title, "title"),
+      statusSelect(task)),
+    el("div", { className: "desc" }, editable(task, "description", task.description, "")),
+    el("div", { className: "meta" },
+      el("span", { className: "mono", textContent: `세션 ${done}/${total} 완료` }),
+      el("span", { className: "progress" }, el("i", { style: `width:${pct}%` })),
+      el("span", { className: "mono", textContent: `${pct}%` })),
+    task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
+    total ? el("div", { className: "sessions" }, task.sessions.map(sessionRow)) : null,
+    el("div", { className: "foot" },
+      el("span", { className: "path mono", title: task.folder, textContent: task.folder.split(/[\\/]/).pop() }),
+      el("span", { className: "mono", textContent: when(task.last_activity) || "활동 없음" })));
+}
+
+/* ---------- 그리기 ---------- */
+
+function tally() {
+  const c = { 전체: tasks.length, 대기: 0, 진행중: 0, 완료: 0, 중지: 0, 취소: 0, 확인: 0 };
+  for (const t of tasks) {
+    c[t.status]++;
+    if (t.warning) c.확인++;
+  }
+  return c;
+}
+
+function draw() {
+  const c = tally();
+  const pick = (key) => { filter = filter === key ? "전체" : key; drawn = null; draw(); };
+
+  $("#stats").replaceChildren(...[
+    ["진행중", "진행중", "세션이 돌고 있다"],
+    ["대기", "대기", "아직 세션이 없다"],
+    ["확인", "확인 필요", "중지된 세션이 남았다"],
+    ["완료", "완료", "세션이 전부 완료"],
+  ].map(([key, label, note]) => {
+    const button = el("button", { className: "stat" },
+      el("span", { className: "bar", style: `background:var(--${key === "확인" ? "대기" : key})` }),
+      el("span", { className: "k", textContent: label }),
+      el("span", { className: "v mono", textContent: String(c[key]) }),
+      el("span", { className: "s", textContent: note }));
+    button.setAttribute("aria-pressed", String(filter === key));
+    button.onclick = () => pick(key);
     return button;
   }));
-}
 
-function renderTasks(tasks) {
-  const list = document.getElementById("tasks");
-  const shape = JSON.stringify([tasks, filter, selected]);
-  if (shape === drawn.list) return;
-  drawn.list = shape;
-
-  if (!tasks.length) {
-    put(list, [el("p", { className: "empty", textContent: "타스크가 없다. `duet add <제목>` 으로 만든다." })]);
-    return;
-  }
-  put(list, tasks.map((t) => {
-    const meta = el("div", { className: "meta" }, badge(t.status),
-      t.override ? el("span", { className: "lock", textContent: "🔒 사람이 정함" }) : null,
-      dots(t.counts),
-      t.warning ? el("span", { className: "warn", title: t.warning, textContent: "⚠" }) : null,
-      el("span", { style: "margin-left:auto", textContent: when(t.last_activity) }));
-
-    const card = el("div", { className: "card" }, el("h2", { textContent: `${t.id}  ${t.title}` }), meta);
-    card.setAttribute("aria-selected", String(t.id === selected));
-    card.onclick = () => { selected = t.id; refresh(); };
-    return card;
+  $("#chips").replaceChildren(...["전체", ...STATUSES].map((s) => {
+    const chip = el("button", { className: "chip" },
+      el("span", { textContent: s }), el("span", { className: "n mono", textContent: String(c[s]) }));
+    chip.setAttribute("aria-pressed", String(filter === s));
+    chip.onclick = () => pick(s);
+    return chip;
   }));
+
+  const q = query.trim().toLowerCase();
+  const hit = (t) => !q || [t.id, t.title, t.description,
+    ...t.sessions.flatMap((s) => [s.title, s.client, s.summary || "", ...s.progress.map((p) => p.msg)]),
+  ].some((text) => String(text).toLowerCase().includes(q));
+
+  const shown = tasks.filter((t) =>
+    (filter === "전체" || (filter === "확인" ? t.warning : t.status === filter)) && hit(t));
+
+  $("#grid").replaceChildren(...(shown.length ? shown.map(card) : [
+    el("div", { className: "empty", textContent: tasks.length
+      ? "조건에 맞는 타스크가 없다."
+      : "아직 타스크가 없다. 오른쪽 위 + 새 타스크로 시작한다." }),
+  ]));
 }
 
-function renderSession(s) {
-  const logs = s.progress.map((p) => el("li", {},
-    el("time", { textContent: when(p.t) }),
-    p.msg + (p.pct != null ? ` (${p.pct}%)` : "")));
+/* ---------- 새로 읽기 ---------- */
 
-  return el("div", { className: "session" },
-    el("div", { className: "row" },
-      el("strong", { textContent: s.title || s.id }),
-      badge(s.status),
-      el("span", { className: "who", textContent: s.alive ? `${s.client} · 살아 있음` : s.client })),
-    logs.length ? el("ul", { className: "log" }, logs) : el("p", { className: "empty", textContent: "보고 없음" }),
-    s.summary ? el("p", { className: `summary ${s.status}`, textContent: `→ ${s.summary}` }) : null);
+function busy() {
+  // 고치는 중이거나 드롭다운을 만지는 중이면 다시 그리지 않는다. 커서가 사라진다.
+  const active = document.activeElement;
+  return !!active && (active.dataset?.editing === "1" || active.tagName === "SELECT");
 }
 
-async function renderDetail(taskId) {
-  const panel = document.getElementById("detail");
-  if (!taskId) return;
-  const t = await api(`/api/tasks/${taskId}`);
+async function refresh(force = false) {
+  try {
+    const data = await api("/api/tasks");
+    $("#home").textContent = data.home;
+    $("#pulse").classList.add("on");
+    $("#state").textContent = "폴더를 읽고 있다";
 
-  // 바뀐 게 없으면 그리지 않는다. 2초마다 통째로 다시 그리면 드롭다운을 여는 중에
-  // 그것이 사라진다.
-  const shape = JSON.stringify(t);
-  if (shape === drawn.detail) return;
-  drawn.detail = shape;
-
-  const picker = el("select");
-  picker.append(el("option", { value: "", textContent: "자동 (세션에서 셈)" }));
-  for (const s of STATUSES.slice(1)) {
-    picker.append(el("option", { value: s, textContent: `사람이 정함: ${s}`, selected: t.override === s }));
+    const shape = JSON.stringify(data.tasks);
+    if (!force && (busy() || shape === drawn)) return;
+    drawn = shape;
+    tasks = data.tasks;
+    draw();
+  } catch (e) {
+    $("#pulse").classList.remove("on");
+    $("#state").textContent = `읽지 못했다: ${e.message}`;
   }
-  picker.onchange = async () => {
-    await api(`/api/tasks/${taskId}/status`, {
+}
+
+$("#q").addEventListener("input", (e) => { query = e.target.value; draw(); });
+$("#new").addEventListener("click", () => { $("#frm").reset(); $("#dlg").showModal(); $("#fTitle").focus(); });
+$("#fCancel").addEventListener("click", () => $("#dlg").close());
+// 한글 입력 중의 Enter는 IME가 조합을 끝내는 데 쓴다. 그 Enter로 폼이 넘어가면 안 되고,
+// 조합이 끝난 뒤의 Enter는 넘어가야 한다. 브라우저 기본 동작만으로는 이게 어긋난다.
+$("#fTitle").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#frm").requestSubmit(); }
+});
+$("#frm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("#fTitle").value.trim();
+  if (!title) return;
+  try {
+    const task = await api("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: picker.value || null }),
+      body: JSON.stringify({ title, description: $("#fDesc").value }),
     });
-    drawn.detail = null;  // 방금 바꿨으니 다시 그린다
-    refresh();
-  };
-
-  put(panel, [
-    el("div", { className: "row" }, el("h2", { textContent: `${t.id}  ${t.title}` }), badge(t.status)),
-    t.description ? el("p", { className: "desc", textContent: t.description }) : null,
-    t.warning ? el("p", { className: "warn", textContent: `⚠ ${t.warning}` }) : null,
-    el("p", { className: "folder", textContent: t.folder }),
-    el("div", { className: "row", style: "margin:12px 0" }, picker,
-      el("span", { className: "hint", textContent: "사람이 정한 상태가 자동 규칙을 덮는다. `task.md`의 `상태:` 줄이 그것이다." })),
-    t.sessions.length ? t.sessions.map(renderSession)
-      : el("p", { className: "empty", textContent: "참여한 세션이 없다." })]);
-}
-
-async function refresh() {
-  try {
-    const data = await api("/api/tasks" + (filter === "전체" ? "" : `?status=${encodeURIComponent(filter)}`));
-    document.getElementById("home").textContent = data.home;
-    renderFilters();
-    renderTasks(data.tasks);
-    if (selected && !data.tasks.some((t) => t.id === selected) && filter === "전체") selected = null;
-    await renderDetail(selected);
-  } catch (e) {
-    put(document.getElementById("tasks"), [
-      el("p", { className: "warn", textContent: `읽지 못했다: ${e.message}` })]);
-  }
-}
+    $("#dlg").close();
+    toast(`[${task.id}] ${task.title} 을(를) 만들었다`);
+    refresh(true);
+  } catch (err) { toast(err.message); }
+});
 
 refresh();
 // 폴더를 다시 읽을 뿐이라 싸다. 파일 감시 + SSE는 뒤 단계에서.
