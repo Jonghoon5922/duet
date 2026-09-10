@@ -283,7 +283,15 @@ function toast(message) {
 
 /* ---------- 타스크 줄 ---------- */
 
+// 살아 있는 세션이 붙어 있는 타스크. 그 창이 일하는 중이라 사람은 손대지 않는다 —
+// 상태는 그 세션이 끝나면 저절로 바뀌고, 제목·설명도 세션이 끝난 뒤에 고친다.
+const busyTask = (task) => task.counts["진행중"] > 0;
+
 function statusSelect(task) {
+  if (busyTask(task)) {
+    return el("span", { className: `tag s-${slug(task.status)}`, textContent: task.status,
+      title: "세션이 일하는 중입니다. 끝나면 상태가 저절로 바뀝니다." });
+  }
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   const sel = el("select", { className: `sel s-${slug(task.status)}`,
     title: "상태. 고르면 그대로 고정됩니다 (🔒). 고르지 않으면 세션에 따라 자동으로 정해집니다." });
@@ -323,6 +331,9 @@ function unlockButton(task) {
 
 // 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
 function editable(task, field, text, className) {
+  if (busyTask(task)) {
+    return el("div", { className, textContent: text, title: "세션이 일하는 중에는 고치지 않습니다." });
+  }
   const node = el("div", { className, contentEditable: "true", spellcheck: false, textContent: text });
   node.dataset.editing = "";
   node.onfocus = () => { node.dataset.editing = "1"; };
