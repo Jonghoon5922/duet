@@ -11,6 +11,7 @@ from typing import Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from . import __version__, core
@@ -55,14 +56,17 @@ def serve() -> None:
 def add(
     title: str = typer.Argument(..., help="타스크 제목"),
     description: str = typer.Option("", "--desc", "-d"),
+    project: str = typer.Option("", "--project", "-p", help="프로젝트 폴더 이름. 비우면 이 폴더의 이름"),
 ) -> None:
-    """타스크를 만든다. `~/.duet/` 아래 폴더 하나가 생긴다."""
+    """타스크를 만든다. `~/.duet/<프로젝트>/` 아래 폴더 하나가 생긴다."""
+    import os
+
     try:
-        task = core.create_task(title, description)
+        task = core.create_task(title, description, project or core.project_name(os.getcwd()))
     except (core.DuetError, OSError) as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(code=1)
-    console.print(f"[{task.id}] {task.title} — {_paint(task.status)}")
+    console.print(f"{escape(f'[{task.ref}]')} {escape(task.title)} — {_paint(task.status)}")
     console.print(f"[dim]{task.dir}[/dim]")
 
 
@@ -75,14 +79,14 @@ def list_tasks(status: Optional[str] = typer.Option(None, "--status", "-s")) -> 
         return
 
     table = Table(box=None, pad_edge=False)
-    for column in ("id", "상태", "제목", "세션", "마지막 활동"):
+    for column in ("타스크", "상태", "제목", "세션", "마지막 활동"):
         table.add_column(column)
     for t in tasks:
         c = t.counts
         table.add_row(
-            t.id,
+            escape(t.ref),
             _paint(t.status) + (" 🔒" if t.override else ""),
-            t.title + ("  [yellow]⚠[/yellow]" if t.warning else ""),
+            escape(t.title) + ("  [yellow]⚠[/yellow]" if t.warning else ""),
             f"{c['진행중']}/{c['완료']}/{c['중지']}",
             f"[dim]{_when(t.last_activity)}[/dim]",
         )
@@ -91,15 +95,17 @@ def list_tasks(status: Optional[str] = typer.Option(None, "--status", "-s")) -> 
 
 
 @app.command()
-def show(task_id: str = typer.Argument(..., help="타스크 id (T001 또는 1)")) -> None:
+def show(task_id: str = typer.Argument(..., help="타스크 (duet/T001, 또는 이 폴더 것이면 T001)")) -> None:
     """타스크 하나의 세션과 진행 로그."""
+    import os
+
     try:
-        task = core.get_task(task_id)
+        task = core.get_task(task_id, hint=core.project_name(os.getcwd()))
     except (core.DuetError, OSError) as e:
         console.print(f"[red]{e}[/red]")
         raise typer.Exit(code=1)
 
-    console.print(f"[bold][{task.id}] {task.title}[/bold] — {_paint(task.status)}")
+    console.print(f"[bold]{escape(f'[{task.ref}]')} {escape(task.title)}[/bold] — {_paint(task.status)}")
     if task.description:
         console.print(task.description)
     if task.warning:

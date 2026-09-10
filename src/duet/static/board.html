@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Duet — 세션 보드</title>
+<title>Duet — 프로젝트 보드</title>
 <style>
 /* 웹폰트를 불러오지 않는다. 네트워크를 쓰지 않는 것이 이 도구의 원칙이라
    설치돼 있는 글꼴만 쓴다 (Pretendard가 있으면 그것, 없으면 맑은 고딕). */
@@ -61,6 +61,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .btn.primary:hover{filter:brightness(1.08)}
 .btn.ghost{border-color:transparent;background:transparent;color:var(--ink-3);padding:3px 8px;font-size:11.5px}
 .btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+.btn.small{padding:4px 9px;font-size:12px}
 .btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .acts{display:flex;gap:2px}
 
@@ -70,7 +71,6 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .stat .bar{position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px}
 .stat .k{font-size:12px;color:var(--ink-2);font-weight:500}
 .stat .v{font-size:26px;font-weight:600;line-height:1.1}
-.stat .s{font-size:11.5px;color:var(--ink-3)}
 .stat[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 
 .toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
@@ -84,21 +84,6 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .search{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;min-width:220px}
 
 .grid{display:flex;flex-direction:column;gap:14px}
-.group{grid-column:1/-1;margin:10px 0 -4px;font-size:13px;font-weight:600;letter-spacing:.01em;
-       display:flex;align-items:baseline;gap:8px}
-.group:first-child{margin-top:0}
-.group .n{font-weight:400;font-size:12px;color:var(--ink-3)}
-.proj{flex:1 1 auto;min-width:70px;overflow:hidden}
-.proj div{display:inline-block;border-radius:4px;padding:0 4px;margin:0 -4px;max-width:100%;
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.proj div:hover{background:var(--panel-2);color:var(--ink)}
-.proj div.guessed{color:var(--ink-3);font-style:italic}
-.proj div:empty::before{content:"프로젝트 없음";color:var(--ink-3)}
-.task{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);
-      display:flex;flex-direction:column;overflow:hidden}
-.task.s-완료{opacity:.82}
-.head{padding:14px 16px 8px;display:flex;gap:10px;align-items:flex-start}
-.stripe{width:4px;align-self:stretch;border-radius:2px;flex:none;margin-top:2px}
 .title{font-weight:600;font-size:15px;line-height:1.35;flex:1;min-width:0;overflow-wrap:break-word;word-break:keep-all;border-radius:4px;padding:0 3px;margin:0 -3px}
 .title:hover{background:var(--panel-2)}
 .tid{color:var(--ink-3);font-weight:500;font-size:13px;padding-top:1px;flex:none}
@@ -142,6 +127,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .tag.s-완료{color:var(--완료);background:var(--완료-bg)}
 .tag.s-중지{color:var(--중지);background:var(--중지-bg)}
 .tag.s-확인필요{color:var(--확인필요);background:var(--확인필요-bg)}
+.tag.s-대기{color:var(--대기);background:var(--대기-bg)}
 .log{margin:0;padding:0 14px 12px 38px;list-style:none}
 .log li{display:flex;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:3px}
 .log time{color:var(--ink-3);font-size:11.5px;flex:none;padding-top:1px}
@@ -150,7 +136,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
       border-top:1px solid var(--line-2);font-size:11.5px;color:var(--ink-3)}
 .foot .mono{flex:none}
 .foot .acts{flex:none;margin-left:auto}
-.empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--ink-3);border:1px dashed var(--line);border-radius:var(--radius)}
+.empty{text-align:center;padding:60px 20px;color:var(--ink-3);border:1px dashed var(--line);border-radius:var(--radius)}
 .hint{font-size:11.5px;color:var(--ink-3);margin-top:14px;line-height:1.7}
 
 dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;padding:0;width:min(520px,92vw);box-shadow:var(--shadow)}
@@ -174,7 +160,7 @@ dialog h2{margin:0 0 14px;font-size:16px}
 .phead h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
 .here{font-size:11px;color:var(--진행중);background:var(--진행중-bg);padding:1px 8px;border-radius:999px}
 .pc{font-size:12px;color:var(--ink-3)}
-.tag.s-대기{color:var(--대기);background:var(--대기-bg)}
+.pempty{padding:14px 16px;color:var(--ink-3);font-size:12.5px}
 
 /* 타스크 줄 */
 .trow{border-bottom:1px solid var(--line-2)}
@@ -184,14 +170,13 @@ dialog h2{margin:0 0 14px;font-size:16px}
 .trow summary:hover{background:var(--panel-2)}
 .trow .stripe{width:4px;height:22px;margin:0;border-radius:2px;flex:none}
 .trow .title{font-size:14px;line-height:1.3}
-.trow.s-완료 .title{color:var(--ink-3)}
+.trow.s-완료 .title,.trow.s-취소 .title{color:var(--ink-3)}
 .trow .cnt{font-size:12px;color:var(--ink-3);flex:none}
 .warn-dot{color:var(--확인필요);flex:none}
 .tbody{padding:6px 16px 10px 30px;background:var(--bg)}
 .tbody .desc,.tbody .meta,.tbody .warn,.tbody .foot{padding-left:0;padding-right:0}
 .tbody .sessions{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;margin-bottom:8px}
 .tbody .foot{border-top:0;padding-top:2px}
-.empty{grid-column:auto}
 .lock{border:0;background:none;padding:0 2px;font-size:12px;cursor:pointer;line-height:1}
 .lock:hover{filter:brightness(1.2)}
 </style>
@@ -200,7 +185,7 @@ dialog h2{margin:0 0 14px;font-size:16px}
 <div class="wrap">
   <header>
     <div>
-      <h1>세션 보드</h1>
+      <h1>프로젝트 보드</h1>
       <div class="sub">
         <span><span class="pulse" id="pulse"></span> <span id="state">읽는 중</span></span>
         <span>·</span><span class="mono" id="home"></span>
@@ -208,8 +193,9 @@ dialog h2{margin:0 0 14px;font-size:16px}
       </div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn" id="hideDone" aria-pressed="false">완료 숨기기</button>
       <button class="btn" id="archive" aria-pressed="false">보관함</button>
-      <button class="btn primary" id="new">+ 새 타스크</button>
+      <button class="btn primary" id="new">+ New Project</button>
     </div>
   </header>
 
@@ -223,19 +209,35 @@ dialog h2{margin:0 0 14px;font-size:16px}
 
   <div class="grid" id="grid"></div>
   <p class="hint">
-    타스크 줄을 누르면 펼쳐집니다. 제목과 설명은 클릭해서 고칩니다. 상태는 세션에 따라 자동으로 정해지고,
-    드롭다운에서 고르면 그대로 고정됩니다 (🔒). 🔒를 누르면 다시 자동으로 돌아갑니다.<br>
-    세션 줄은 사람이 만들지 않습니다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓습니다. 세션을 누르면 그 로그가 펼쳐집니다.
+    프로젝트가 상자 하나, 타스크가 그 안의 줄입니다. 번호는 프로젝트 안에서 1부터 매겨집니다. 줄을 누르면 펼쳐지고 제목·설명은 클릭해서 고칩니다.<br>
+    상태는 세션에 따라 자동으로 정해지고, 드롭다운에서 고르면 그대로 고정됩니다 (🔒). 🔒를 누르면 다시 자동으로 돌아갑니다.
+    끝난 프로젝트는 상자째 보관함으로 옮깁니다 — 타스크는 프로젝트의 이력이라 하나씩 치우지 않습니다.<br>
+    세션 줄은 사람이 만들지 않습니다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓습니다.
   </p>
 </div>
 
-<dialog id="dlg">
-  <form id="frm">
-    <h2>새 타스크</h2>
-    <div class="field"><label for="fTitle">제목</label><input id="fTitle" required placeholder="예: pc101pm 전환"></div>
-    <div class="field"><label for="fDesc">설명 (선택)</label><textarea id="fDesc" placeholder="무엇을 하는 일인지 한두 줄"></textarea></div>
+<!-- 새 프로젝트. 프로젝트는 첫 타스크와 함께 태어난다 — 빈 상자를 만들지 않는다. -->
+<dialog id="dlgProject">
+  <form id="frmProject">
+    <h2>New Project</h2>
+    <div class="field"><label for="pName">Project name</label><input id="pName" required placeholder="e.g. nefss" autocomplete="off"></div>
+    <div class="field"><label for="pTitle">First task</label><input id="pTitle" required placeholder="e.g. pc101pm 전환"></div>
+    <div class="field"><label for="pDesc">Description (optional)</label><textarea id="pDesc" placeholder="What this task is about"></textarea></div>
     <div class="actions">
-      <button type="button" class="btn" id="fCancel">취소</button>
+      <button type="button" class="btn" id="pCancel">Cancel</button>
+      <button type="submit" class="btn primary">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 프로젝트 상자 안의 새 타스크 -->
+<dialog id="dlgTask">
+  <form id="frmTask">
+    <h2 id="tHead">새 타스크</h2>
+    <div class="field"><label for="tTitle">제목</label><input id="tTitle" required placeholder="예: pc101pm 전환"></div>
+    <div class="field"><label for="tDesc">설명 (선택)</label><textarea id="tDesc" placeholder="무엇을 하는 일인지 한두 줄"></textarea></div>
+    <div class="actions">
+      <button type="button" class="btn" id="tCancel">취소</button>
       <button type="submit" class="btn primary">만들기</button>
     </div>
   </form>
@@ -247,16 +249,21 @@ const STATUSES = ["대기", "진행중", "확인 필요", "완료", "보류", "�
 // 사람이 고를 수 있는 것은 셋 — 끝났다, 잠시 둔다, 안 한다. 대기·진행중·확인 필요는 세션이
 // 없느냐 살아 있느냐 끊겼느냐는 사실이지 고르는 게 아니다. 되돌리려면 🔒를 푼다.
 const HUMAN = ["완료", "보류", "취소"];
+const CLOSED = ["완료", "취소"];
+const UNSORTED = "_미분류";   // 프로젝트를 모르는 타스크가 모이는 폴더 이름. 주소에도 이렇게 쓴다
 // CSS 클래스·변수 이름에는 띄어쓰기를 못 넣는다.
 const slug = (st) => st.replace(/\s+/g, "");
-const FIELD_NAMES = { title: "제목", description: "설명", project: "프로젝트" };
+const FIELD_NAMES = { title: "제목", description: "설명" };
 let tasks = [];
+let projects = [];      // 타스크가 없는 프로젝트 폴더도 상자로 뜬다
 let filter = "전체";
 let query = "";
 let archived = false;   // 보관함을 보고 있나
+let hideDone = false;   // 완료·취소 줄을 접어 두나
 let here = "";          // 대시보드를 띄운 폴더의 프로젝트 이름
-let drawn = null;   // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
-const opened = new Set();  // 펼쳐 둔 세션 id
+let drawn = null;       // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
+const opened = new Set();  // 펼쳐 둔 타스크 ref·세션 id
+let newTaskProject = "";   // 새 타스크 대화상자가 열린 프로젝트
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => {
@@ -265,12 +272,14 @@ const el = (tag, props = {}, ...kids) => {
   return node;
 };
 const when = (stamp) => stamp ? stamp.replace("T", " ").split(".")[0].slice(5) : "";
+const JSON_HEADERS = { "content-type": "application/json" };
 
 async function api(path, options) {
   const res = await fetch(path, options);
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
   return res.json();
 }
+const post = (path, body) => api(path, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body ?? {}) });
 
 let toastTimer;
 function toast(message) {
@@ -281,15 +290,13 @@ function toast(message) {
   toastTimer = setTimeout(() => node.classList.remove("show"), 2600);
 }
 
-/* ---------- 카드 ---------- */
+/* ---------- 타스크 줄 ---------- */
 
 function statusSelect(task) {
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
-  // "계산값이냐 사람이 정한 값이냐"는 내부 사정이라 화면에 올리지 않는다 — 🔒 하나로 족하다.
   const sel = el("select", { className: `sel s-${slug(task.status)}`,
     title: "상태. 고르면 그대로 고정됩니다 (🔒). 고르지 않으면 세션에 따라 자동으로 정해집니다." });
   if (!HUMAN.includes(task.status)) {
-    // 확인 필요: 지금 상태로 보이되 고를 수는 없다.
     sel.append(el("option", { value: "", textContent: task.status, selected: true, disabled: true }));
   }
   for (const st of HUMAN) {
@@ -297,11 +304,7 @@ function statusSelect(task) {
   }
   sel.onchange = async () => {
     try {
-      await api(`/api/tasks/${task.id}/status`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: sel.value }),
-      });
+      await post(`/api/tasks/${task.ref}/status`, { status: sel.value });
       toast(`${task.id} → ${sel.value}`);
       refresh(true);
     } catch (e) { toast(e.message); }
@@ -319,11 +322,7 @@ function unlockButton(task) {
   button.onclick = async (e) => {
     e.stopPropagation();
     try {
-      await api(`/api/tasks/${task.id}/status`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: null }),
-      });
+      await post(`/api/tasks/${task.ref}/status`, { status: null });
       toast(`${task.id} 상태를 자동으로 돌렸습니다`);
       refresh(true);
     } catch (err) { toast(err.message); }
@@ -346,12 +345,8 @@ function editable(task, field, text, className) {
     if (value === text) return;
     if (field === "title" && !value) { node.textContent = text; return; }
     try {
-      await api(`/api/tasks/${task.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ [field]: value }),
-      });
-      toast(`${task.id} ${FIELD_NAMES[field]}을(를) 고쳤다`);
+      await api(`/api/tasks/${task.ref}`, { method: "PATCH", headers: JSON_HEADERS, body: JSON.stringify({ [field]: value }) });
+      toast(`${task.id} ${FIELD_NAMES[field]}을(를) 고쳤습니다`);
       refresh(true);
     } catch (e) { toast(e.message); node.textContent = text; }
   };
@@ -367,16 +362,11 @@ function sessionControl(task, s) {
   for (const v of ["완료", "중지"]) {
     sel.append(el("option", { value: v, textContent: v, selected: s.status === v }));
   }
-  // summary 안에 있는 컨트롤이라, 막지 않으면 누를 때마다 펼침이 같이 토글된다.
   sel.onclick = (e) => e.stopPropagation();
   sel.onchange = async (e) => {
     e.stopPropagation();
     try {
-      await api(`/api/tasks/${task.id}/sessions/${s.id}/status`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: sel.value }),
-      });
+      await post(`/api/tasks/${task.ref}/sessions/${s.id}/status`, { status: sel.value });
       toast(`${s.title || s.id} → ${sel.value}`);
       refresh(true);
     } catch (err) { toast(err.message); refresh(true); }
@@ -410,35 +400,11 @@ function sessionRow(task, s) {
   return row;
 }
 
-async function act(path, message) {
-  try {
-    const body = await api(path, { method: "POST", headers: { "content-type": "application/json" } });
-    toast(body.note || message);
-    refresh(true);
-  } catch (e) { toast(e.message); }
-}
-
 function ghost(label, onclick) {
   return el("button", { className: "btn ghost", type: "button", textContent: label, onclick });
 }
 
-// 되돌릴 수 있는 것만 한 번 눌러 되게 뒀다. 닫기는 상태를 자동으로 되돌리면 풀리고,
-// 보관은 폴더를 옮길 뿐이라 되돌리기가 있다. 지우는 버튼은 두지 않는다.
-function footButtons(task, row) {
-  const fold = ghost("▲ 접기", () => { row.open = false; });
-  if (archived) {
-    return [ghost("보드로 되돌리기", () => act(`/api/tasks/${task.id}/unarchive`, `${task.id} 을(를) 보드로 되돌렸다`)), fold];
-  }
-  const out = [];
-  // 끝난 것만 치운다. 진행중인 걸 보관하면 살아 있는 세션의 경로가 끊긴다.
-  if (task.status === "완료" || task.status === "취소") {
-    out.push(ghost("보관함에 넣기", () => act(`/api/tasks/${task.id}/archive`, `${task.id} 을(를) 보관함에 넣었다`)));
-  }
-  out.push(fold);
-  return out;
-}
-
-// 타스크 한 줄. 누르면 설명·세션·손잡이가 펼쳐진다.
+// 타스크 한 줄. 누르면 설명·세션이 펼쳐진다. 지우거나 치우는 버튼은 없다 — 그건 프로젝트 단위다.
 function taskRow(task) {
   const total = task.sessions.length;
   const done = task.counts["완료"];
@@ -450,7 +416,7 @@ function taskRow(task) {
   const sel = statusSelect(task);
   sel.onclick = (e) => e.stopPropagation();
 
-  const row = el("details", { className: `trow s-${slug(task.status)}`, open: opened.has(task.id) },
+  const row = el("details", { className: `trow s-${slug(task.status)}`, open: opened.has(task.ref) },
     el("summary", {},
       el("span", { className: "stripe", style: `background:var(--${slug(task.status)})` }),
       el("span", { className: "tid mono", textContent: task.id }),
@@ -469,31 +435,57 @@ function taskRow(task) {
       task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
       total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
       el("div", { className: "foot" },
-        el("span", { className: "proj" },
-          editable(task, "project", task.project, task.project_override ? "" : "guessed")),
+        el("span", { className: "mono", title: task.folder, textContent: task.ref }),
         task.last_activity
-          ? el("span", { className: "mono", title: task.folder, textContent: `마지막 활동 ${when(task.last_activity)}` })
+          ? el("span", { className: "mono", textContent: `마지막 활동 ${when(task.last_activity)}` })
           : null,
-        el("span", { className: "acts" }))));
-  // 푸터 버튼은 줄(row)이 만들어진 뒤에 넣는다 — 접기가 자기 줄을 닫아야 해서.
-  row.querySelector(".acts").append(...footButtons(task, row));
-  row.ontoggle = () => { row.open ? opened.add(task.id) : opened.delete(task.id); };
+        el("span", { className: "acts" }, ghost("▲ 접기", () => { row.open = false; })))));
+  row.ontoggle = () => { row.open ? opened.add(task.ref) : opened.delete(task.ref); };
   return row;
 }
 
+/* ---------- 프로젝트 상자 ---------- */
+
+async function act(path, body, fallback) {
+  try {
+    const res = await post(path, body);
+    toast(res.note || fallback);
+    refresh(true);
+  } catch (e) { toast(e.message); }
+}
+
+function projectButtons(name, list) {
+  if (archived) {
+    return [el("button", { className: "btn small", type: "button", textContent: "보드로 되돌리기",
+      onclick: () => act("/api/projects/unarchive", { name }, "되돌렸습니다") })];
+  }
+  const out = [el("button", { className: "btn small", type: "button", textContent: "+ 타스크",
+    onclick: () => openTaskDialog(name) })];
+  // 살아 있는 세션이 있으면 서버가 거절한다. 여기서는 미리 숨기지 않고 이유를 토스트로 보여준다.
+  out.push(el("button", { className: "btn small", type: "button", textContent: "보관함으로",
+    title: "프로젝트 폴더째 보관함으로 옮깁니다. 지우지 않습니다.",
+    onclick: () => act("/api/projects/archive", { name }, "보관했습니다") }));
+  return out;
+}
+
 // 프로젝트 하나가 상자 하나. 그 안에 타스크가 줄로 들어간다.
-function projectCard(name, list) {
+function projectCard(name, list, hidden) {
   const running = list.filter((t) => t.status === "진행중").length;
   const attention = list.filter((t) => t.status === "확인 필요").length;
+  const shown = hideDone ? list.filter((t) => !CLOSED.includes(t.status)) : list;
+  const tucked = list.length - shown.length;
   return el("article", { className: "pcard" },
     el("div", { className: "phead" },
-      el("h2", { textContent: name || "프로젝트 모름" }),
+      el("h2", { textContent: name || UNSORTED }),
       name && name === here ? el("span", { className: "here", textContent: "지금 이 폴더" }) : null,
       el("span", { className: "spacer" }),
       running ? el("span", { className: "tag s-진행중", textContent: `진행중 ${running}` }) : null,
       attention ? el("span", { className: "tag s-확인필요", textContent: `확인 필요 ${attention}` }) : null,
-      el("span", { className: "pc mono", textContent: `타스크 ${list.length}` })),
-    el("div", { className: "trows" }, list.map(taskRow)));
+      el("span", { className: "pc mono", textContent: `타스크 ${list.length}` + (tucked ? ` (완료 ${tucked} 숨김)` : "") }),
+      el("span", { className: "acts" }, projectButtons(name, list))),
+    shown.length
+      ? el("div", { className: "trows" }, shown.map(taskRow))
+      : el("div", { className: "pempty", textContent: list.length ? "열린 타스크가 없습니다." : "타스크가 없습니다. + 타스크로 시작하세요." }));
 }
 
 /* ---------- 그리기 ---------- */
@@ -509,15 +501,10 @@ function draw() {
   const c = tally();
   const pick = (key) => { filter = filter === key ? "전체" : key; drawn = null; draw(); };
 
-  $("#stats").replaceChildren(...[
-    ["진행중", "진행중"],
-    ["대기", "대기"],
-    ["확인 필요", "확인 필요"],
-    ["완료", "완료"],
-  ].map(([key, label]) => {
+  $("#stats").replaceChildren(...["진행중", "대기", "확인 필요", "완료"].map((key) => {
     const button = el("button", { className: "stat" },
       el("span", { className: "bar", style: `background:var(--${slug(key)})` }),
-      el("span", { className: "k", textContent: label }),
+      el("span", { className: "k", textContent: key }),
       el("span", { className: "v mono", textContent: String(c[key]) }));
     button.setAttribute("aria-pressed", String(filter === key));
     button.onclick = () => pick(key);
@@ -533,15 +520,15 @@ function draw() {
   }));
 
   const q = query.trim().toLowerCase();
-  const hit = (t) => !q || [t.id, t.title, t.description,
+  const hit = (t) => !q || [t.id, t.title, t.description, t.project,
     ...t.sessions.flatMap((s) => [s.title, s.client, s.summary || "", ...s.progress.map((p) => p.msg)]),
   ].some((text) => String(text).toLowerCase().includes(q));
-
-  const shown = tasks.filter((t) =>
-    (filter === "전체" || t.status === filter) && hit(t));
+  const shown = tasks.filter((t) => (filter === "전체" || t.status === filter) && hit(t));
 
   // 프로젝트별로 묶는다. 지금 이 폴더의 프로젝트가 맨 위, 모르는 것은 맨 아래.
   const groups = new Map();
+  const filtering = filter !== "전체" || q;
+  if (!filtering) for (const p of projects) groups.set(p, []);  // 빈 프로젝트도 상자로
   for (const t of shown) {
     const key = t.project || "";
     (groups.get(key) ?? groups.set(key, []).get(key)).push(t);
@@ -553,13 +540,12 @@ function draw() {
     if (!b) return -1;
     return a.localeCompare(b, "ko");
   });
-
   const cards = order.map((key) => projectCard(key, groups.get(key)));
 
-  $("#grid").replaceChildren(...(shown.length ? cards : [
+  $("#grid").replaceChildren(...(cards.length ? cards : [
     el("div", { className: "empty", textContent: tasks.length
       ? "조건에 맞는 타스크가 없습니다."
-      : archived ? "보관함이 비어 있습니다." : "아직 타스크가 없습니다. 오른쪽 위 + 새 타스크로 시작하세요." }),
+      : archived ? "보관함이 비어 있습니다." : "아직 프로젝트가 없습니다. 오른쪽 위 + New Project로 시작하세요." }),
   ]));
 }
 
@@ -580,10 +566,11 @@ async function refresh(force = false) {
     $("#archive").textContent = data.archived ? `보관함 ${data.archived}` : "보관함";
     here = data.here || "";
 
-    const shape = JSON.stringify([archived, data.tasks]);
+    const shape = JSON.stringify([archived, hideDone, data.projects, data.tasks]);
     if (!force && (busy() || shape === drawn)) return;
     drawn = shape;
     tasks = data.tasks;
+    projects = data.projects || [];
     draw();
   } catch (e) {
     $("#pulse").classList.remove("on");
@@ -591,34 +578,72 @@ async function refresh(force = false) {
   }
 }
 
+/* ---------- 손잡이 ---------- */
+
 $("#q").addEventListener("input", (e) => { query = e.target.value; draw(); });
 $("#archive").addEventListener("click", (e) => {
   archived = !archived;
   e.currentTarget.setAttribute("aria-pressed", String(archived));
   // 보관함에는 집계 타일이 뜻이 없다. 이미 다 끝난 것들이다.
   $("#stats").hidden = archived;
+  $("#hideDone").hidden = archived;
   filter = "전체";
   refresh(true);
 });
-$("#new").addEventListener("click", () => { $("#frm").reset(); $("#dlg").showModal(); $("#fTitle").focus(); });
-$("#fCancel").addEventListener("click", () => $("#dlg").close());
+$("#hideDone").addEventListener("click", (e) => {
+  hideDone = !hideDone;
+  e.currentTarget.setAttribute("aria-pressed", String(hideDone));
+  try { localStorage.setItem("duet.hideDone", hideDone ? "1" : ""); } catch (_) {}
+  refresh(true);
+});
+try {
+  if (localStorage.getItem("duet.hideDone") === "1") { hideDone = true; $("#hideDone").setAttribute("aria-pressed", "true"); }
+} catch (_) {}
+
 // 한글 입력 중의 Enter는 IME가 조합을 끝내는 데 쓴다. 그 Enter로 폼이 넘어가면 안 되고,
 // 조합이 끝난 뒤의 Enter는 넘어가야 한다. 브라우저 기본 동작만으로는 이게 어긋난다.
-$("#fTitle").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("#frm").requestSubmit(); }
-});
-$("#frm").addEventListener("submit", async (e) => {
+function submitOnEnter(input, form) {
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+  });
+}
+
+// 새 프로젝트 = 이름 + 첫 타스크. 폴더는 첫 타스크와 함께 생긴다.
+$("#new").addEventListener("click", () => { $("#frmProject").reset(); $("#dlgProject").showModal(); $("#pName").focus(); });
+$("#pCancel").addEventListener("click", () => $("#dlgProject").close());
+submitOnEnter($("#pName"), $("#frmProject"));
+submitOnEnter($("#pTitle"), $("#frmProject"));
+$("#frmProject").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const title = $("#fTitle").value.trim();
+  const project = $("#pName").value.trim();
+  const title = $("#pTitle").value.trim();
+  if (!project || !title) return;
+  try {
+    const task = await post("/api/tasks", { title, description: $("#pDesc").value, project });
+    $("#dlgProject").close();
+    toast(`${project} 프로젝트를 만들고 [${task.id}] ${task.title}을(를) 넣었습니다`);
+    refresh(true);
+  } catch (err) { toast(err.message); }
+});
+
+// 프로젝트 상자 안의 새 타스크
+function openTaskDialog(project) {
+  newTaskProject = project;
+  $("#frmTask").reset();
+  $("#tHead").textContent = `${project || UNSORTED} — 새 타스크`;
+  $("#dlgTask").showModal();
+  $("#tTitle").focus();
+}
+$("#tCancel").addEventListener("click", () => $("#dlgTask").close());
+submitOnEnter($("#tTitle"), $("#frmTask"));
+$("#frmTask").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const title = $("#tTitle").value.trim();
   if (!title) return;
   try {
-    const task = await api("/api/tasks", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, description: $("#fDesc").value }),
-    });
-    $("#dlg").close();
-    toast(`[${task.id}] ${task.title} 을(를) 만들었다`);
+    const task = await post("/api/tasks", { title, description: $("#tDesc").value, project: newTaskProject });
+    $("#dlgTask").close();
+    toast(`[${task.ref}] ${task.title}을(를) 만들었습니다`);
     refresh(true);
   } catch (err) { toast(err.message); }
 });

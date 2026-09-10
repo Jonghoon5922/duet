@@ -15,129 +15,133 @@ def client():
 
 
 def test_보드가_타스크를_내려준다(client):
-    task = core.create_task("pc101pm 전환", "NEFSS→BXM")
+    task = core.create_task("pc101pm 전환", "NEFSS→BXM", project="nefss")
     s = core.register_session("Claude Code")
-    core.join(s, task.id, "DBIO 계층 전환")
+    core.join(s, task.ref, "DBIO 계층 전환")
     core.report(s, "DBIO 5개 전환", 40)
 
     body = client.get("/api/tasks").json()
-    assert [t["id"] for t in body["tasks"]] == [task.id]
+    assert [t["ref"] for t in body["tasks"]] == ["nefss/T001"]
     assert body["tasks"][0]["status"] == core.RUNNING
     assert body["tasks"][0]["counts"] == {"진행중": 1, "완료": 0, "중지": 0}
+    assert body["projects"] == ["nefss"]
 
 
 def test_상세에_세션과_진행_로그가_들어온다(client):
-    task = core.create_task("전환")
+    task = core.create_task("전환", project="nefss")
     s = core.register_session("Claude Code")
-    core.join(s, task.id, "DBIO 계층 전환")
+    core.join(s, task.ref, "DBIO 계층 전환")
     core.report(s, "설계서 훑음", 20)
 
-    body = client.get(f"/api/tasks/{task.id}").json()
+    body = client.get("/api/tasks/nefss/T001").json()
     assert body["sessions"][0]["title"] == "DBIO 계층 전환"
     assert body["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
     assert body["sessions"][0]["alive"] is True
 
 
+def test_미분류는_주소에_미분류로_쓴다(client):
+    task = core.create_task("어디 것인지 모름")
+    body = client.get(f"/api/tasks/{task.ref}").json()
+    assert body["ref"] == "_미분류/T001" and body["project"] == ""
+
+
 def test_상태로_거른다(client):
     done = core.create_task("끝난 것")
-    core.set_status(done.id, core.DONE)
+    core.set_status(done.ref, core.DONE)
     core.create_task("안 끝난 것")
 
     body = client.get("/api/tasks", params={"status": core.DONE}).json()
-    assert [t["id"] for t in body["tasks"]] == [done.id]
+    assert [t["ref"] for t in body["tasks"]] == [done.ref]
 
 
 def test_화면에서_정한_상태가_task_md에_적힌다(client):
-    task = core.create_task("전환")
+    task = core.create_task("전환", project="nefss")
     s = core.register_session()
-    core.join(s, task.id)
+    core.join(s, task.ref)
 
-    body = client.post(f"/api/tasks/{task.id}/status", json={"status": core.DONE}).json()
+    body = client.post(f"/api/tasks/{task.ref}/status", json={"status": core.DONE}).json()
     assert body["status"] == core.DONE
     assert "상태: 완료" in (task.dir / "task.md").read_text(encoding="utf-8")
 
     # 다시 자동으로 — 그 줄이 사라지고 세션에서 센 값이 돌아온다
-    body = client.post(f"/api/tasks/{task.id}/status", json={"status": None}).json()
+    body = client.post(f"/api/tasks/{task.ref}/status", json={"status": None}).json()
     assert body["status"] == core.RUNNING
     assert "상태:" not in (task.dir / "task.md").read_text(encoding="utf-8")
 
 
 def test_없는_타스크와_모르는_상태는_거부한다(client):
-    task = core.create_task("전환")
-    assert client.get("/api/tasks/T999").status_code == 404
-    assert client.post(f"/api/tasks/{task.id}/status", json={"status": "아무거나"}).status_code == 400
+    task = core.create_task("전환", project="nefss")
+    assert client.get("/api/tasks/nefss/T999").status_code == 404
+    assert client.post(f"/api/tasks/{task.ref}/status", json={"status": "아무거나"}).status_code == 400
 
 
 def test_화면에서_타스크를_만든다(client):
-    body = client.post("/api/tasks", json={"title": "pc101pm 전환", "description": "NEFSS→BXM"}).json()
-    assert body["id"] == "T001"
+    body = client.post("/api/tasks", json={"title": "pc101pm 전환", "description": "NEFSS→BXM", "project": "nefss"}).json()
+    assert body["ref"] == "nefss/T001"
     assert body["status"] == core.WAITING
-    assert core.get_task("T001").description == "NEFSS→BXM"
+    assert core.get_task("nefss/T001").description == "NEFSS→BXM"
 
     assert client.post("/api/tasks", json={"title": "  "}).status_code == 400
+    assert client.post("/api/tasks", json={"title": "x", "project": "_보관"}).status_code == 400
+
+
+def test_새_프로젝트는_첫_타스크와_함께_생긴다(client):
+    client.post("/api/tasks", json={"title": "첫 일", "project": "새것"})
+    assert (core.home() / "새것" / "T001-첫-일").is_dir()
+    assert client.get("/api/tasks").json()["projects"] == ["새것"]
 
 
 def test_제목과_설명을_인라인으로_고친다(client):
-    task = core.create_task("옛 제목", "옛 설명")
-    core.set_status(task.id, core.HOLD)  # 사람이 정해 둔 상태
+    task = core.create_task("옛 제목", "옛 설명", project="nefss")
+    core.set_status(task.ref, core.HOLD)  # 사람이 정해 둔 상태
 
-    body = client.patch(f"/api/tasks/{task.id}", json={"title": "새 제목"}).json()
+    body = client.patch(f"/api/tasks/{task.ref}", json={"title": "새 제목"}).json()
     assert body["title"] == "새 제목"
     assert body["description"] == "옛 설명", "안 준 것은 안 바뀐다"
     assert body["override"] == core.HOLD, "상태는 건드리지 않는다"
 
-    assert client.patch(f"/api/tasks/{task.id}", json={"title": ""}).status_code == 400
-
-
-def test_목록에_세션과_로그가_함께_온다(client):
-    task = core.create_task("전환")
-    s = core.register_session("Claude Code")
-    core.join(s, task.id, "DBIO 계층 전환")
-    core.report(s, "설계서 훑음", 30)
-
-    row = client.get("/api/tasks").json()["tasks"][0]
-    assert row["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
-    assert row["folder"].endswith(task.dir.name)
+    assert client.patch(f"/api/tasks/{task.ref}", json={"title": ""}).status_code == 400
 
 
 def test_화면에서_중지_세션을_완료로_바꾼다(client):
-    task = core.create_task("전환")
+    task = core.create_task("전환", project="nefss")
     s = core.register_session()
-    core.join(s, task.id)
+    core.join(s, task.ref)
     core.finish(s, core.STOPPED, "여기까지")
 
-    body = client.post(f"/api/tasks/{task.id}/sessions/{s.id}/status", json={"status": "완료"}).json()
+    body = client.post(f"/api/tasks/{task.ref}/sessions/{s.id}/status", json={"status": "완료"}).json()
     assert body["status"] == core.DONE, "타스크가 스스로 닫힌다"
     assert body["sessions"][0]["by_human"] is True
     assert body["override"] is None
 
 
 def test_살아있는_세션_변경은_거부한다(client):
-    task = core.create_task("전환")
+    task = core.create_task("전환", project="nefss")
     s = core.register_session()
-    core.join(s, task.id)
+    core.join(s, task.ref)
 
-    res = client.post(f"/api/tasks/{task.id}/sessions/{s.id}/status", json={"status": "완료"})
+    res = client.post(f"/api/tasks/{task.ref}/sessions/{s.id}/status", json={"status": "완료"})
     assert res.status_code == 400
     assert "살아 있는" in res.json()["detail"]
 
 
-def test_화면에서_프로젝트를_고친다(client):
-    task = core.create_task("전환")
-    s = core.register_session("Claude Code", cwd=r"C:\project\nefss")
-    core.join(s, task.id)
-
-    body = client.get("/api/tasks").json()
-    assert body["tasks"][0]["project"] == "nefss", "세션이 뜬 폴더에서 저절로"
-    assert body["tasks"][0]["project_override"] == ""
-
-    edited = client.patch(f"/api/tasks/{task.id}", json={"project": "일지"}).json()
-    assert edited["project"] == "일지" and edited["project_override"] == "일지"
-
-    back = client.patch(f"/api/tasks/{task.id}", json={"project": ""}).json()
-    assert back["project"] == "nefss", "지우면 다시 센다"
+def test_화면에서_프로젝트를_옮긴다(client):
+    task = core.create_task("전환", project="nefss")
+    edited = client.patch(f"/api/tasks/{task.ref}", json={"project": "일지"}).json()
+    assert edited["ref"] == "일지/T001"
+    assert client.get("/api/tasks/nefss/T001").status_code == 404
 
 
-def test_새_타스크에_프로젝트를_줄_수_있다(client):
-    body = client.post("/api/tasks", json={"title": "전환", "project": "nefss"}).json()
-    assert body["project"] == "nefss"
+def test_프로젝트를_보관하고_되돌린다(client):
+    core.create_task("하나", project="nefss")
+    core.create_task("둘", project="nefss")
+    core.create_task("남의 것", project="duet")
+
+    body = client.post("/api/projects/archive", json={"name": "nefss"}).json()
+    assert body["moved"] == ["nefss/T001", "nefss/T002"]
+    assert [t["ref"] for t in client.get("/api/tasks").json()["tasks"]] == ["duet/T001"]
+    assert client.get("/api/tasks").json()["archived"] == 1
+    assert [t["ref"] for t in client.get("/api/archive").json()["tasks"]] == ["nefss/T002", "nefss/T001"]
+
+    assert client.post("/api/projects/unarchive", json={"name": "nefss"}).json()["moved"] == ["nefss/T001", "nefss/T002"]
+    assert client.post("/api/projects/archive", json={"name": "없음"}).status_code == 400

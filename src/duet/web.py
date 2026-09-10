@@ -4,6 +4,8 @@
 요청이 올 때마다 `~/.duet/`를 다시 읽는다. 그래서 사람이 탐색기에서 `task.md`를
 고쳐도 새로고침 한 번이면 반영된다.
 
+타스크 주소는 `/api/tasks/<프로젝트>/<T00n>` 이다. 프로젝트를 모르는 것은 `_미분류`.
+
 지금은 화면이 2초마다 다시 물어본다. 파일 감시(watchdog) + SSE는 뒤 단계에서.
 바깥에 열지 않는다. 127.0.0.1만 듣는다.
 """
@@ -35,15 +37,35 @@ class StatusIn(BaseModel):
 class TaskIn(BaseModel):
     title: str
     description: str = ""
+    #: 빈 문자열은 `_미분류`. 프로젝트 폴더가 없으면 첫 타스크와 함께 생긴다.
     project: str = ""
+
+
+class ProjectIn(BaseModel):
+    #: 빈 문자열은 `_미분류` 상자다.
+    name: str = ""
 
 
 class EditIn(BaseModel):
     #: 준 것만 바뀐다. None은 "안 건드림"이다.
     title: str | None = None
     description: str | None = None
-    #: 빈 문자열이면 `프로젝트:` 줄을 지워 다시 세게 한다.
+    #: 주면 그 프로젝트로 옮긴다 (번호가 새로 난다).
     project: str | None = None
+
+
+def _ref(project: str, tid: str) -> str:
+    return f"{project}/{tid}"
+
+
+def _run(fn, *args):
+    """core 호출 하나를 HTTP 오류로 옮긴다. 규칙 위반은 400, 디스크는 500."""
+    try:
+        return fn(*args)
+    except core.DuetError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def create_app() -> FastAPI:
@@ -61,99 +83,68 @@ def create_app() -> FastAPI:
         rows = [t.to_detail() for t in core.list_tasks(status)]
         return {
             "tasks": rows,
+            # 타스크가 하나도 없는 프로젝트 폴더도 상자로 뜬다.
+            "projects": core.projects(),
             "statuses": list(core.TASK_STATUSES),
             "home": str(core.home()),
-            "archived": len(core.archived_dirs()),
+            "archived": len({t.project for t in core.list_archived()}),
             # 대시보드를 띄운 폴더. 지금 어느 프로젝트를 보고 있는지의 기준이다.
             "here": core.project_name(str(Path.cwd())),
         }
 
     @app.post("/api/tasks", status_code=201)
     def new_task(body: TaskIn) -> dict[str, Any]:
-        try:
-            return core.create_task(body.title, body.description, body.project).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.patch("/api/tasks/{task_id}")
-    def edit_task(task_id: str, body: EditIn) -> dict[str, Any]:
-        """제목·설명 인라인 편집. 사람이 정한 상태는 건드리지 않는다."""
-        try:
-            return core.update_task(task_id, body.title, body.description, body.project).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        return _run(core.create_task, body.title, body.description, body.project).to_detail()
 
     @app.get("/api/archive")
     def archive() -> dict[str, Any]:
         rows = [t.to_detail() for t in core.list_archived()]
-        return {"tasks": rows, "archived": len(rows), "home": str(core.home())}
+        return {"tasks": rows, "archived": len({t.project for t in core.list_archived()}), "home": str(core.home())}
 
-    @app.post("/api/tasks/{task_id}/archive")
-    def archive_task(task_id: str) -> dict[str, Any]:
+    @app.post("/api/projects/archive")
+    def archive_project(body: ProjectIn) -> dict[str, Any]:
+        """프로젝트 폴더째 보관함으로."""
+        moved = _run(core.archive_project, body.name)
+        return {"moved": [t.ref for t in moved], "note": f"'{body.name or core.UNSORTED_DIRNAME}'을(를) 보관함으로 옮겼습니다."}
+
+    @app.post("/api/projects/unarchive")
+    def unarchive_project(body: ProjectIn) -> dict[str, Any]:
+        moved = _run(core.unarchive_project, body.name)
+        return {"moved": [t.ref for t in moved], "note": f"'{body.name or core.UNSORTED_DIRNAME}'을(를) 보드로 되돌렸습니다."}
+
+    @app.get("/api/tasks/{project}/{tid}")
+    def task(project: str, tid: str) -> dict[str, Any]:
         try:
-            return core.archive_task(task_id).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            return core.get_task(_ref(project, tid)).to_detail()
+        except (core.DuetError, OSError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
-    @app.post("/api/tasks/{task_id}/unarchive")
-    def unarchive_task(task_id: str) -> dict[str, Any]:
-        try:
-            return core.unarchive_task(task_id).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    @app.patch("/api/tasks/{project}/{tid}")
+    def edit_task(project: str, tid: str, body: EditIn) -> dict[str, Any]:
+        """제목·설명 인라인 편집. 사람이 정한 상태는 건드리지 않는다."""
+        return _run(core.update_task, _ref(project, tid), body.title, body.description, body.project).to_detail()
 
-    @app.post("/api/tasks/{task_id}/close")
-    def close_task(task_id: str) -> dict[str, Any]:
+    @app.post("/api/tasks/{project}/{tid}/status")
+    def set_status(project: str, tid: str, body: StatusIn) -> dict[str, Any]:
+        """사람이 정한 상태를 `task.md`에 적거나(=자동 규칙보다 우선) 지운다."""
+        return _run(core.set_status, _ref(project, tid), body.status).to_detail()
+
+    @app.post("/api/tasks/{project}/{tid}/close")
+    def close_task(project: str, tid: str) -> dict[str, Any]:
         """이 타스크를 닫는다. 살아 있는 세션은 그대로 두고 알려만 준다."""
-        try:
-            task = core.close_task(task_id)
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
+        task = _run(core.close_task, _ref(project, tid))
         alive = task.counts[core.RUNNING]
         return task.to_detail() | {
             "note": f"살아 있는 세션 {alive}개는 그대로 둔다. 그 창을 닫으면 스스로 중지로 적힌다."
             if alive else "닫았다."
         }
 
-    @app.post("/api/tasks/{task_id}/sessions/{session_id}/status")
-    def set_session_status(task_id: str, session_id: str, body: StatusIn) -> dict[str, Any]:
+    @app.post("/api/tasks/{project}/{tid}/sessions/{session_id}/status")
+    def set_session_status(project: str, tid: str, session_id: str, body: StatusIn) -> dict[str, Any]:
         """끝난 세션을 사람이 완료/중지로 바꾼다. 살아 있는 세션은 거부된다."""
         if body.status is None:
             raise HTTPException(status_code=400, detail="세션은 자동으로 되돌릴 수 없다.")
-        try:
-            return core.set_session_status(task_id, session_id, body.status).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    @app.get("/api/tasks/{task_id}")
-    def task(task_id: str) -> dict[str, Any]:
-        try:
-            return core.get_task(task_id).to_detail()
-        except (core.DuetError, OSError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
-
-    @app.post("/api/tasks/{task_id}/status")
-    def set_status(task_id: str, body: StatusIn) -> dict[str, Any]:
-        """사람이 정한 상태를 `task.md`에 적거나(=자동 규칙보다 우선) 지운다."""
-        try:
-            return core.set_status(task_id, body.status).to_detail()
-        except core.DuetError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        except OSError as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        return _run(core.set_session_status, _ref(project, tid), session_id, body.status).to_detail()
 
     return app
 
