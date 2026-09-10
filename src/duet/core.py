@@ -430,8 +430,15 @@ def list_tasks(status: str | None = None) -> list[Task]:
 
 
 def projects() -> list[str]:
-    """보드에 있는 프로젝트 이름들. 모르는 것은 빈 문자열."""
-    return ["" if p.name == UNSORTED_DIRNAME else p.name for p in project_dirs()]
+    """보드에 있는 프로젝트 이름들. 모르는 것은 빈 문자열 — 단, 비어 있으면 상자로 띄우지 않는다."""
+    out = []
+    for p in project_dirs():
+        if p.name == UNSORTED_DIRNAME:
+            if task_dirs_in(p):
+                out.append("")
+        else:
+            out.append(p.name)
+    return out
 
 
 def similar_tasks(title: str, limit: int = 3) -> list[Task]:
