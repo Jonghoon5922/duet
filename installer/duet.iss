@@ -51,6 +51,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 ; Claude Code 사용자 설정(~\.claude.json)에 항목 하나를 더한다. 모든 프로젝트 창에서 붙는다.
 ; 남의 설정은 건드리지 않고 고치기 전에 백업을 남긴다.
+; 조용한 설치(/VERYSILENT)는 unchecked 를 안 지키고 전부 실행했다 — 실측. 조용히 깔 때는
+; /TASKS="claudecode" 처럼 명시하라.
 Name: "claudecode"; Description: "Claude Code에 연결합니다 (모든 프로젝트 창에서 Duet이 붙습니다)"; GroupDescription: "연결:"
 Name: "claudedesktop"; Description: "Claude Desktop에도 연결합니다"; GroupDescription: "연결:"; Flags: unchecked
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

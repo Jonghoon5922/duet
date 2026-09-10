@@ -134,35 +134,56 @@ duet ui        # http://127.0.0.1:8737
 → 드롭다운에서 `완료` (= `task.md`에 `상태: 완료`). 세션이 더 붙어도 안 바뀐다.
 → 🔒 표시. 🔒를 누르면 그 줄이 지워지고 다시 센다.
 
-## 쓰기
+## 설치
 
-프로젝트 `.venv`를 거치지 않는다. 셸마다 uv 데이터 폴더가 다를 수 있어 `.venv`가 한쪽에서는
-멀쩡하고 다른 쪽에서는 "없는 인터프리터"가 되는 일이 실제로 있었다. `uv run`이 창이 열릴 때마다
-환경을 맞추려 들면서, 떠 있는 duet 서버가 잡고 있는 `duet.exe`를 다시 쓰려다 막히기도 했다.
-그래서 **독립 환경에 실행 파일로** 깐다. 소스는 editable이라 코드를 고치면 바로 반영된다.
+`dist\duet-setup-<버전>.exe` 하나를 실행한다. 파이썬도 uv도 필요 없다. 관리자 권한도 묻지 않는다.
+
+1. 시작 전에 "Claude 창을 모두 닫아 주세요" 안내 → 닫고 [확인]
+2. 체크박스 "Claude Code에 연결합니다" — 켜진 채로 [설치]
+3. 끝. `내 사용자 폴더\Duet\`에 실행 파일이 놓이고, Claude Code 사용자 설정(`~\.claude.json`)에 Duet이 등록된다.
+
+그다음은 **Claude Code 창을 열고 평소처럼 일을 시키는 것**이 전부다. 창이 뜰 때 Duet이 붙고,
+Claude가 타스크를 만들거나 붙고, 진행을 남기고, 끝내면 완료 보고를 한다.
+
+**보드는 Claude 창이 열려 있는 동안 늘 켜져 있다.** 창마다 뜨는 MCP 서버가 보드도 겸한다 —
+첫 창이 8737 포트를 잡고, 그 창이 닫히면 다음 창이 이어받는다. 브라우저에 `http://127.0.0.1:8737`을
+즐겨찾기 해 두면 된다. Claude 창이 하나도 없을 때는 시작 메뉴 [Duet 보드]로 띄운다 (창 없이 브라우저만
+열리고, 10분 동안 안 보면 스스로 꺼진다).
+
+제거는 제어판 → 앱 → Duet. 실행 파일과 앱 연결이 지워지고 기록(`~\.duet`)은 남는다.
+
+### 왜 실행 파일로 묶었나
+
+셸마다 uv 데이터 폴더가 다를 수 있고, Claude 데스크탑 안 터미널은 `AppData`가 앱 전용 폴더로 바뀌어
+보인다. `.venv`도 uv 트램폴린도 거기서 깨졌다. PyInstaller로 파이썬째 묶은 실행 파일은 그런 것에
+기대지 않는다. 설치 위치도 그래서 `AppData` 밖이다.
+
+### 빌드
 
 ```bash
-uv tool install --editable --python 3.12 C:/project/duet
-uv tool update-shell          # ~/.local/bin 을 PATH에 (한 번만)
+uv sync --group dev
+uv run --no-sync pyinstaller installer/duet.spec --noconfirm --distpath dist/app
+"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer/duet.iss
 ```
 
-그다음 사용자 범위로 한 번 등록하면 **모든 프로젝트 창**에서 붙는다. 창마다 할 것은 없다.
+실행 파일이 둘이다 — `duet.exe`(콘솔, MCP는 stdio가 필요하다)와 `duet-board.exe`(창 없음, 보드).
+무거운 `_internal`은 둘이 나눠 쓴다. 자세한 것은 `installer/`의 각 파일 머리에.
+
+### 개발 중에 붙이기
 
 ```bash
-claude mcp add -s user duet -- duet serve
+uv tool install --editable --python 3.12 C:/project/duet   # ~/.local/bin/duet.exe
+duet mcp-register                                           # Claude Code 사용자 범위
 ```
 
-(`duet`가 PATH에 없으면 `C:\Users\<이름>\.local\bin\duet.exe` 전체 경로로.)
-
-의존성을 바꿨을 때만 `uv tool install --editable --reinstall C:/project/duet`.
-개발 중 테스트는 `uv sync --group dev` 뒤 `uv run --no-sync pytest`.
+`duet mcp-list`로 어느 앱에 붙어 있는지 본다. 개발 중 테스트는 `uv run --no-sync pytest`.
 
 MCP 도구: `list_tasks` · `create_task` · `join_task` · `get_task` · `update_task` · `report_progress` · `complete_session` · `pause_session`
 
 `get_task`가 인수인계다 — 세션 B가 A의 진행 로그를 읽고 이어받는다.
 `pause_session`은 "여기까지"일 때. 중지된 세션이 있으면 타스크는 닫히지 않는다.
 `update_task`는 사용자가 시켜서 제목·설명·상태를 고칠 때. 폴더 이름은 그대로 둔다.
-CLI: `duet serve` · `duet ui` · `duet add` · `duet list` · `duet show` · `duet version`
+CLI: `duet serve` · `duet ui` · `duet add` · `duet list` · `duet show` · `duet version` · `duet mcp-register` · `duet mcp-unregister` · `duet mcp-list`
 
 ```bash
 uv run pytest && uv run python scripts/smoke.py
