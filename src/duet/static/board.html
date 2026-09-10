@@ -439,22 +439,24 @@ function taskRow(task) {
       el("span", { className: "tid mono", textContent: task.id }),
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
-      el("span", { className: "cnt mono", title: "세션 완료/전체", textContent: `${done}/${total}` }),
+      total ? el("span", { className: "cnt mono", title: "세션 완료/전체", textContent: `${done}/${total}` }) : null,
       sel,
       unlockButton(task)),
     el("div", { className: "tbody" },
       el("div", { className: "desc" }, editable(task, "description", task.description, "")),
-      el("div", { className: "meta" },
+      // 세션이 하나도 없으면 셀 것이 없다. 빈 값을 "0/0"으로 찍지 않는다.
+      total ? el("div", { className: "meta" },
         el("span", { className: "mono", textContent: `세션 ${done}/${total} 완료` }),
         el("span", { className: "progress" }, el("i", { style: `width:${pct}%` })),
-        el("span", { className: "mono", textContent: `${pct}%` })),
+        el("span", { className: "mono", textContent: `${pct}%` })) : null,
       task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
       total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
       el("div", { className: "foot" },
         el("span", { className: "proj" },
           editable(task, "project", task.project, task.project_override ? "" : "guessed")),
-        el("span", { className: "mono", title: task.folder,
-                     textContent: task.last_activity ? `마지막 활동 ${when(task.last_activity)}` : "아직 활동 없음" }),
+        task.last_activity
+          ? el("span", { className: "mono", title: task.folder, textContent: `마지막 활동 ${when(task.last_activity)}` })
+          : null,
         el("span", { className: "acts" }))));
   // 푸터 버튼은 줄(row)이 만들어진 뒤에 넣는다 — 접기가 자기 줄을 닫아야 해서.
   row.querySelector(".acts").append(...footButtons(task, row));
