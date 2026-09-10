@@ -48,8 +48,9 @@ WAITING, RUNNING, DONE, STOPPED = "대기", "진행중", "완료", "중지"
 #: 타스크에만 있는 상태. 확인 필요는 세션에서 세고, 보류·취소는 사람만 정한다.
 ATTENTION, HOLD, CANCELLED = "확인 필요", "보류", "취소"
 TASK_STATUSES = (WAITING, RUNNING, ATTENTION, DONE, HOLD, CANCELLED)
-#: 사람이 고를 수 있는 것. 확인 필요는 "세션이 끊겼다"는 사실이라 고르는 것이 아니다.
-HUMAN_STATUSES = (WAITING, RUNNING, DONE, HOLD, CANCELLED)
+#: 사람이 고를 수 있는 것. 진행중은 "세션이 살아 있다", 확인 필요는 "세션이 끊겼다"는
+#: 사실이라 고르는 것이 아니다 — 창을 열거나 닫아야 바뀐다.
+HUMAN_STATUSES = (WAITING, DONE, HOLD, CANCELLED)
 #: 세션이 끝난 상태. 세션의 `중지`는 "안 끝난 채 끊겼다"이고 타스크의 `보류`와 다르다.
 CLOSED = (DONE, STOPPED)
 
@@ -420,7 +421,7 @@ def set_status(task_id: str | int, status: str | None) -> Task:
     if status is not None and status not in HUMAN_STATUSES:
         raise DuetError(
             f"고를 수 있는 상태: {', '.join(HUMAN_STATUSES)}. "
-            f"'{ATTENTION}'는 세션이 끊겼다는 사실이라 고르는 것이 아니다."
+            f"'{RUNNING}'과 '{ATTENTION}'는 세션이 살아 있느냐 끊겼느냐는 사실이라 고르는 것이 아니다."
         )
     task = get_task(task_id)
     _write_task(task.dir, task.title, task.description, status, task.project_override)
