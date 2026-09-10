@@ -31,7 +31,8 @@ app = typer.Typer(
 )
 console = Console()
 
-COLOR = {"대기": "dim", "진행중": "cyan", "완료": "green", "중지": "yellow", "취소": "red"}
+COLOR = {"대기": "dim", "진행중": "cyan", "확인 필요": "yellow", "완료": "green",
+         "보류": "magenta", "취소": "red", "중지": "yellow"}
 
 
 def _paint(status: str) -> str:

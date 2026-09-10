@@ -157,7 +157,7 @@ reader.tool("join_task", {"task_id": task_id, "session_title": "이어받기 검
 reader.tool("report_progress", {"message": "A와 B 로그 읽음. Service 계층이 남았다"})
 paused = reader.tool("pause_session", {"reason": "여기까지 — Service는 다음 세션에서"})
 check("pause_session → 세션 중지", paused["status"] == "중지", paused.get("note", ""))
-check("중지가 있으면 타스크는 열린 채", paused["task"]["status"] == "진행중")
+check("중지가 있으면 타스크는 확인 필요", paused["task"]["status"] == "확인 필요")
 reader.close()
 check("멈춘 뒤 창을 닫아도 이유가 남는다",
       [s.summary for s in core.get_task(task_id).sessions if s.title == "이어받기 검토"]
@@ -182,7 +182,7 @@ c.close()
 time.sleep(0.5)
 stopped = [s for s in core.get_task(task_id).sessions if s.title == "설계서 docx 빌드"][0]
 check("보고 없이 닫힌 세션은 중지", stopped.status == "중지", stopped.summary)
-check("중지가 섞이면 타스크는 열린 채로 남는다", core.get_task(task_id).status == "진행중",
+check("중지가 섞이면 타스크는 확인 필요로 남는다", core.get_task(task_id).status == "확인 필요",
       core.get_task(task_id).warning)
 
 # 사람이 정한 상태가 이긴다
@@ -191,7 +191,7 @@ d = Client()
 d.tool("join_task", {"task_id": task_id, "session_title": "잠긴 타스크에 붙는 세션"})
 check("사람이 정한 상태는 세션이 붙어도 안 바뀐다", core.get_task(task_id).status == "완료")
 d.close()
-check("그 줄을 지우면 다시 센다", core.set_status(task_id, None).status == "진행중")
+check("그 줄을 지우면 다시 센다", core.set_status(task_id, None).status == "확인 필요")
 
 # 사람이 손대는 자리: 중지 세션을 완료로 → 타스크가 스스로 닫힌다
 stopped = [s for s in core.get_task(task_id).sessions if s.status == "중지"]

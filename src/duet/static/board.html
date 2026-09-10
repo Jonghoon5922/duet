@@ -14,6 +14,8 @@
   --진행중:#2563B8; --진행중-bg:#E3ECFA;
   --대기:#B7791F;   --대기-bg:#FBF0DA;
   --중지:#6B7280;   --중지-bg:#ECEEF2;
+  --확인필요:#C2410C; --확인필요-bg:#FEE9DC;
+  --보류:#6B7280;   --보류-bg:#ECEEF2;
   --완료:#1E7F4F;   --완료-bg:#DDF2E6;
   --취소:#B42318;   --취소-bg:#FBE9E7;
   --shadow:0 1px 2px rgba(23,26,33,.06), 0 4px 14px rgba(23,26,33,.06);
@@ -27,6 +29,8 @@
     --진행중:#7FA6E8; --진행중-bg:#1C2A40;
     --대기:#E2B25C;   --대기-bg:#3A2E15;
     --중지:#A0A6B3;   --중지-bg:#2A2F38;
+    --확인필요:#F59E6B; --확인필요-bg:#3D2314;
+    --보류:#A0A6B3;   --보류-bg:#2A2F38;
     --완료:#5FC98F;   --완료-bg:#16321F;
     --취소:#F08A80;   --취소-bg:#3A1E1B;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
@@ -105,7 +109,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .meta{padding:0 16px 12px 30px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--ink-3);flex-wrap:wrap}
 .progress{height:4px;background:var(--line-2);border-radius:2px;flex:1;min-width:70px;overflow:hidden}
 .progress i{display:block;height:100%;background:var(--완료);border-radius:2px;transition:width .25s}
-.warn{padding:0 16px 12px 30px;color:var(--대기);font-size:12.5px}
+.warn{padding:0 16px 12px 30px;color:var(--확인필요);font-size:12.5px}
 
 .sel{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 24px 4px 8px;font-size:12.5px;
      font-weight:500;appearance:none;-webkit-appearance:none;
@@ -114,6 +118,8 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .sel.s-진행중{color:var(--진행중);background-color:var(--진행중-bg);border-color:transparent}
 .sel.s-대기{color:var(--대기);background-color:var(--대기-bg);border-color:transparent}
 .sel.s-중지{color:var(--중지);background-color:var(--중지-bg);border-color:transparent}
+.sel.s-확인필요{color:var(--확인필요);background-color:var(--확인필요-bg);border-color:transparent}
+.sel.s-보류{color:var(--보류);background-color:var(--보류-bg);border-color:transparent}
 .sel.s-완료{color:var(--완료);background-color:var(--완료-bg);border-color:transparent}
 .sel.s-취소{color:var(--취소);background-color:var(--취소-bg);border-color:transparent}
 
@@ -135,6 +141,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .tag.s-진행중{color:var(--진행중);background:var(--진행중-bg)}
 .tag.s-완료{color:var(--완료);background:var(--완료-bg)}
 .tag.s-중지{color:var(--중지);background:var(--중지-bg)}
+.tag.s-확인필요{color:var(--확인필요);background:var(--확인필요-bg)}
 .log{margin:0;padding:0 14px 12px 38px;list-style:none}
 .log li{display:flex;gap:8px;font-size:12.5px;color:var(--ink-2);margin-bottom:3px}
 .log time{color:var(--ink-3);font-size:11.5px;flex:none;padding-top:1px}
@@ -179,7 +186,7 @@ dialog h2{margin:0 0 14px;font-size:16px}
 .trow .title{font-size:14px;line-height:1.3}
 .trow.s-완료 .title{color:var(--ink-3)}
 .trow .cnt{font-size:12px;color:var(--ink-3);flex:none}
-.warn-dot{color:var(--대기);flex:none}
+.warn-dot{color:var(--확인필요);flex:none}
 .tbody{padding:6px 16px 10px 30px;background:var(--bg)}
 .tbody .desc,.tbody .meta,.tbody .warn,.tbody .foot{padding-left:0;padding-right:0}
 .tbody .sessions{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;margin-bottom:8px}
@@ -236,7 +243,11 @@ dialog h2{margin:0 0 14px;font-size:16px}
 <div class="toast" id="toast"></div>
 
 <script>
-const STATUSES = ["대기", "진행중", "완료", "중지", "취소"];
+const STATUSES = ["대기", "진행중", "확인 필요", "완료", "보류", "취소"];
+// 사람이 고를 수 있는 것. "확인 필요"는 세션이 끊겼다는 사실이지 고르는 게 아니다.
+const HUMAN = ["대기", "진행중", "완료", "보류", "취소"];
+// CSS 클래스·변수 이름에는 띄어쓰기를 못 넣는다.
+const slug = (st) => st.replace(/\s+/g, "");
 const FIELD_NAMES = { title: "제목", description: "설명", project: "프로젝트" };
 let tasks = [];
 let filter = "전체";
@@ -274,8 +285,12 @@ function toast(message) {
 function statusSelect(task) {
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   // "계산값이냐 사람이 정한 값이냐"는 내부 사정이라 화면에 올리지 않는다 — 🔒 하나로 족하다.
-  const sel = el("select", { className: `sel s-${task.status}`, title: "상태" });
-  for (const st of STATUSES) {
+  const sel = el("select", { className: `sel s-${slug(task.status)}`, title: "상태" });
+  if (!HUMAN.includes(task.status)) {
+    // 확인 필요: 지금 상태로 보이되 고를 수는 없다.
+    sel.append(el("option", { value: "", textContent: task.status, selected: true, disabled: true }));
+  }
+  for (const st of HUMAN) {
     sel.append(el("option", { value: st, textContent: st, selected: task.status === st }));
   }
   sel.onchange = async () => {
@@ -433,9 +448,9 @@ function taskRow(task) {
   const sel = statusSelect(task);
   sel.onclick = (e) => e.stopPropagation();
 
-  const row = el("details", { className: `trow s-${task.status}`, open: opened.has(task.id) },
+  const row = el("details", { className: `trow s-${slug(task.status)}`, open: opened.has(task.id) },
     el("summary", {},
-      el("span", { className: "stripe", style: `background:var(--${task.status})` }),
+      el("span", { className: "stripe", style: `background:var(--${slug(task.status)})` }),
       el("span", { className: "tid mono", textContent: task.id }),
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
@@ -467,14 +482,14 @@ function taskRow(task) {
 // 프로젝트 하나가 상자 하나. 그 안에 타스크가 줄로 들어간다.
 function projectCard(name, list) {
   const running = list.filter((t) => t.status === "진행중").length;
-  const attention = list.filter((t) => t.warning).length;
+  const attention = list.filter((t) => t.status === "확인 필요").length;
   return el("article", { className: "pcard" },
     el("div", { className: "phead" },
       el("h2", { textContent: name || "프로젝트 모름" }),
       name && name === here ? el("span", { className: "here", textContent: "지금 이 폴더" }) : null,
       el("span", { className: "spacer" }),
       running ? el("span", { className: "tag s-진행중", textContent: `진행중 ${running}` }) : null,
-      attention ? el("span", { className: "tag s-대기", textContent: `확인 ${attention}` }) : null,
+      attention ? el("span", { className: "tag s-확인필요", textContent: `확인 필요 ${attention}` }) : null,
       el("span", { className: "pc mono", textContent: `타스크 ${list.length}` })),
     el("div", { className: "trows" }, list.map(taskRow)));
 }
@@ -482,11 +497,9 @@ function projectCard(name, list) {
 /* ---------- 그리기 ---------- */
 
 function tally() {
-  const c = { 전체: tasks.length, 대기: 0, 진행중: 0, 완료: 0, 중지: 0, 취소: 0, 확인: 0 };
-  for (const t of tasks) {
-    c[t.status]++;
-    if (t.warning) c.확인++;
-  }
+  const c = { 전체: tasks.length };
+  for (const st of STATUSES) c[st] = 0;
+  for (const t of tasks) c[t.status] = (c[t.status] || 0) + 1;
   return c;
 }
 
@@ -497,11 +510,11 @@ function draw() {
   $("#stats").replaceChildren(...[
     ["진행중", "진행중"],
     ["대기", "대기"],
-    ["확인", "확인 필요"],
+    ["확인 필요", "확인 필요"],
     ["완료", "완료"],
   ].map(([key, label]) => {
     const button = el("button", { className: "stat" },
-      el("span", { className: "bar", style: `background:var(--${key === "확인" ? "대기" : key})` }),
+      el("span", { className: "bar", style: `background:var(--${slug(key)})` }),
       el("span", { className: "k", textContent: label }),
       el("span", { className: "v mono", textContent: String(c[key]) }));
     button.setAttribute("aria-pressed", String(filter === key));
@@ -523,7 +536,7 @@ function draw() {
   ].some((text) => String(text).toLowerCase().includes(q));
 
   const shown = tasks.filter((t) =>
-    (filter === "전체" || (filter === "확인" ? t.warning : t.status === filter)) && hit(t));
+    (filter === "전체" || t.status === filter) && hit(t));
 
   // 프로젝트별로 묶는다. 지금 이 폴더의 프로젝트가 맨 위, 모르는 것은 맨 아래.
   const groups = new Map();

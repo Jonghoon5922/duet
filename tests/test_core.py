@@ -59,8 +59,8 @@ def test_중지가_섞이면_완료로_계산하지_않는다():
     core.join(b, task.id)
     after = core.finish(b, core.STOPPED, "여기까지")
 
-    assert after.status == core.RUNNING, "사람이 판단하도록 열어 둔다"
-    assert "중지된 세션 1개" in after.warning
+    assert after.status == core.ATTENTION, "사람이 판단하도록 열어 둔다"
+    assert "끊긴 세션 1개" in after.warning
 
 
 def test_하트비트가_끊기면_중지로_친다():
@@ -185,7 +185,7 @@ def test_끝난_세션은_사람이_상태를_바꾼다():
     s = core.register_session()
     core.join(s, task.id)
     core.finish(s, core.STOPPED, "여기까지")
-    assert core.get_task(task.id).status == core.RUNNING
+    assert core.get_task(task.id).status == core.ATTENTION
 
     after = core.set_session_status(task.id, s.id, core.DONE)
     assert after.status == core.DONE, "자동 규칙이 다시 센다"
@@ -194,7 +194,7 @@ def test_끝난_세션은_사람이_상태를_바꾼다():
     assert after.sessions[0].summary == "여기까지", "그 세션이 남긴 말은 지우지 않는다"
 
     back = core.set_session_status(task.id, s.id, core.STOPPED)
-    assert back.status == core.RUNNING
+    assert back.status == core.ATTENTION
 
 
 def test_살아있는_세션은_사람이_못_바꾼다():

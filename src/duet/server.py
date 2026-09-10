@@ -34,7 +34,9 @@ def label_client(name: str | None) -> str:
 
 def build_instructions() -> str:
     """열린 타스크 목록을 instructions에 넣는다. 연결할 때 한 번만 전달된다."""
-    open_tasks = [t for t in core.list_tasks() if t.status in (core.WAITING, core.RUNNING)]
+    open_tasks = [
+        t for t in core.list_tasks() if t.status in (core.WAITING, core.RUNNING, core.ATTENTION)
+    ]
     lines = [
         "이 세션이 어떤 일감(타스크)에 속하는지 기록하는 도구다. "
         "진행 로그는 네가 직접 쓴다 — 이 도구는 아무것도 요약해주지 않는다.",
@@ -212,7 +214,8 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
         description=(
             "타스크의 제목·설명·상태를 고친다. **사용자가 그렇게 하라고 했을 때만 쓴다** — "
             "일이 어디까지 됐는지는 report_progress로 남기는 것이지 설명을 고쳐 적는 게 아니다. "
-            "status를 주면 사람이 정한 상태로 적혀 자동 규칙(세션을 세는 것)을 덮는다. "
+            "status는 대기·진행중·완료·보류·취소 중 하나 (확인 필요는 세션이 끊겼다는 사실이라 고를 수 없다). "
+            "사람이 정한 상태로 적혀 자동 규칙(세션을 세는 것)을 덮는다. "
             "`자동`을 주면 그 줄을 지워 다시 세게 한다."
         ),
     )

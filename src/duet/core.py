@@ -13,8 +13,8 @@
 규칙 두 개가 전부다:
 
 1. **타스크 상태는 저장하지 않고 센다.** 폴더 안 세션 파일을 세서 정한다.
-   전부 `완료`면 `완료`, 하나라도 살아 있으면 `진행중`, 중지가 섞이면 `진행중`으로
-   열어 둔다 (실패한 세션을 완료로 뭉개지 않는다).
+   전부 `완료`면 `완료`, 하나라도 살아 있으면 `진행중`, 끊긴 세션이 남았으면
+   `확인 필요` (실패한 세션을 완료로 뭉개지 않는다). `보류`·`취소`는 사람만 정한다.
 2. **사람이 정한 것이 이긴다.** `task.md`에 `상태: 완료` 한 줄이 있으면 그게 상태다.
    그 줄을 지우면 다시 센다.
 
@@ -45,7 +45,12 @@ HEARTBEAT_SEC = 30.0
 STALE_SEC = 90.0  # 이만큼 하트비트가 없으면 죽은 세션이다
 
 WAITING, RUNNING, DONE, STOPPED = "대기", "진행중", "완료", "중지"
-TASK_STATUSES = (WAITING, RUNNING, DONE, STOPPED, "취소")
+#: 타스크에만 있는 상태. 확인 필요는 세션에서 세고, 보류·취소는 사람만 정한다.
+ATTENTION, HOLD, CANCELLED = "확인 필요", "보류", "취소"
+TASK_STATUSES = (WAITING, RUNNING, ATTENTION, DONE, HOLD, CANCELLED)
+#: 사람이 고를 수 있는 것. 확인 필요는 "세션이 끊겼다"는 사실이라 고르는 것이 아니다.
+HUMAN_STATUSES = (WAITING, RUNNING, DONE, HOLD, CANCELLED)
+#: 세션이 끝난 상태. 세션의 `중지`는 "안 끝난 채 끊겼다"이고 타스크의 `보류`와 다르다.
 CLOSED = (DONE, STOPPED)
 
 TASK_DIR = re.compile(r"^(T\d{3,})(?:-.*)?$")
@@ -201,8 +206,10 @@ class Task:
         c = self.counts
         if not self.sessions:
             return WAITING
-        if c[RUNNING] or c[STOPPED]:
-            return RUNNING  # 중지가 섞였으면 사람이 볼 때까지 열어 둔다
+        if c[RUNNING]:
+            return RUNNING
+        if c[STOPPED]:
+            return ATTENTION  # 끊긴 세션이 남았다. 이어갈지 끝낼지 사람이 정한다
         return DONE
 
     @property
@@ -216,12 +223,9 @@ class Task:
 
         닫고 나서도 경고가 남으면 "확인 필요"가 영영 줄지 않는다 — 이미 판단한 일이다.
         """
-        if self.status in (DONE, "취소"):
+        if self.status != ATTENTION:
             return ""
-        c = self.counts
-        if c[STOPPED] and not c[RUNNING]:
-            return f"중지된 세션 {c[STOPPED]}개 — 이어서 할지 사람이 정한다"
-        return ""
+        return f"끊긴 세션 {self.counts[STOPPED]}개 — 이어갈지 끝낼지 사람이 정한다"
 
     def to_dict(self) -> dict[str, Any]:
         """카드 한 장에 필요한 만큼."""
@@ -261,8 +265,10 @@ def _read_task(task_dir: Path) -> Task:
 
     override = None
     match = STATUS_LINE.search(text)
-    if match and match.group(1) in TASK_STATUSES:
-        override = match.group(1)
+    if match:
+        written = "보류" if match.group(1) == "중지" else match.group(1)  # 옛 이름
+        if written in HUMAN_STATUSES:
+            override = written
 
     found = PROJECT_LINE.search(text)
     project = found.group(1) if found else ""
@@ -358,7 +364,7 @@ def similar_tasks(title: str, limit: int = 3) -> list[Task]:
     words = {w for w in re.split(r"[\s·,]+", title.lower()) if len(w) > 1}
     found = []
     for task in list_tasks():
-        if task.status in (DONE, "취소"):
+        if task.status in (DONE, CANCELLED):
             continue
         other = {w for w in re.split(r"[\s·,]+", task.title.lower()) if len(w) > 1}
         overlap = words & other
@@ -411,8 +417,11 @@ def update_task(
 
 def set_status(task_id: str | int, status: str | None) -> Task:
     """사람이 상태를 정한다. None을 주면 그 줄을 지워 다시 세게 한다."""
-    if status is not None and status not in TASK_STATUSES:
-        raise DuetError(f"모르는 상태다: {status} (가능: {', '.join(TASK_STATUSES)})")
+    if status is not None and status not in HUMAN_STATUSES:
+        raise DuetError(
+            f"고를 수 있는 상태: {', '.join(HUMAN_STATUSES)}. "
+            f"'{ATTENTION}'는 세션이 끊겼다는 사실이라 고르는 것이 아니다."
+        )
     task = get_task(task_id)
     _write_task(task.dir, task.title, task.description, status, task.project_override)
     return get_task(task_id)
