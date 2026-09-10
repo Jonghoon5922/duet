@@ -17,3 +17,6 @@ Thumbs.db
 .idea/
 .vscode/
 launch.json
+
+# 런처 없이 띄우기 위한 의존성 환경 (AppData 밖). scripts/duet-run.cmd 가 쓴다
+.duet-env/
