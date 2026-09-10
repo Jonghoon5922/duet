@@ -79,12 +79,12 @@ def test_화면에서_타스크를_만든다(client):
 
 def test_제목과_설명을_인라인으로_고친다(client):
     task = core.create_task("옛 제목", "옛 설명")
-    core.set_status(task.id, core.WAITING)  # 사람이 정해 둔 상태
+    core.set_status(task.id, core.HOLD)  # 사람이 정해 둔 상태
 
     body = client.patch(f"/api/tasks/{task.id}", json={"title": "새 제목"}).json()
     assert body["title"] == "새 제목"
     assert body["description"] == "옛 설명", "안 준 것은 안 바뀐다"
-    assert body["override"] == core.WAITING, "상태는 건드리지 않는다"
+    assert body["override"] == core.HOLD, "상태는 건드리지 않는다"
 
     assert client.patch(f"/api/tasks/{task.id}", json={"title": ""}).status_code == 400
 

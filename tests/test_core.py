@@ -80,9 +80,9 @@ def test_사람이_적은_상태가_이긴다():
     s = core.register_session()
     core.join(s, task.id)
 
-    assert core.set_status(task.id, core.WAITING).status == core.WAITING
+    assert core.set_status(task.id, core.HOLD).status == core.HOLD
     core.finish(s, core.DONE, "끝")
-    assert core.get_task(task.id).status == core.WAITING, "자동 규칙이 덮지 않는다"
+    assert core.get_task(task.id).status == core.HOLD, "자동 규칙이 덮지 않는다"
 
     assert core.set_status(task.id, None).status == core.DONE, "지우면 다시 센다"
 
@@ -167,12 +167,12 @@ def test_상세에_다른_세션의_로그가_들어온다():
 
 def test_제목과_설명을_고쳐도_폴더와_상태는_그대로다():
     task = core.create_task("옛 제목", "옛 설명")
-    core.set_status(task.id, core.WAITING)  # 사람이 정해 둔 상태
+    core.set_status(task.id, core.HOLD)  # 사람이 정해 둔 상태
 
     after = core.update_task(task.id, title="새 제목")
     assert (after.title, after.description) == ("새 제목", "옛 설명"), "안 준 것은 안 바뀐다"
     assert after.dir.name == task.dir.name, "id가 판별자다"
-    assert after.status == core.WAITING and after.override == core.WAITING
+    assert after.status == core.HOLD and after.override == core.HOLD
 
     assert core.update_task(task.id, description="새 설명").description == "새 설명"
     with pytest.raises(core.DuetError):
