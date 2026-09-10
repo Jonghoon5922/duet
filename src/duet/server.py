@@ -143,6 +143,8 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
             "프로젝트 이름은 넣지 마라 — 이미 프로젝트로 묶여 있다 "
             "(X: 'Duet 대시보드 만들기' / O: '대시보드 만들기'). "
             "세션 하나로 끝날 잔일이면 타스크를 만들지 말고 그냥 해라.\n"
+            "**description**: 사람이 메모하듯 한두 문장. 무엇을 왜 하는지, 끝나면 뭐가 되는지만. "
+            "번호 매기기·괄호 설명·'끝:' 같은 틀을 쓰지 마라.\n"
             "**project**: 보통 비워 둔다 — 이 창이 뜬 폴더의 프로젝트에 만들어진다. "
             "다른 프로젝트 일을 대신 만들 때만 적는다. 번호는 그 프로젝트 안에서 1부터 난다.\n"
             "비슷한 타스크가 이미 있으면 만들지 않고 후보를 돌려준다. 같은 일이면 그것에 "
@@ -177,7 +179,8 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
         description=(
             "이 세션을 타스크에 묶는다. 타스크가 `진행중`이 되고 이 세션의 보고가 "
             "그 타스크에 쌓인다. 세션 하나는 타스크 하나에만 붙는다. "
-            "task_id는 이 프로젝트 것이면 T001, 다른 프로젝트 것이면 duet/T001."
+            "task_id는 이 프로젝트 것이면 T001, 다른 프로젝트 것이면 duet/T001. "
+            "session_title은 이 창이 이 타스크에서 맡은 몫을 짧게 ('DBIO 전환', '설계서 빌드')."
         ),
     )
     def join_task_tool(ctx: Context, task_id: str, session_title: str = "") -> dict[str, Any]:
@@ -285,7 +288,9 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
         name="report_progress",
         description=(
             "이 세션의 진행 로그를 한 줄 남긴다. 다음 세션이 읽고 이어받을 수 있게 "
-            "무엇을 했고 어디까지 됐는지 사실만 쓴다."
+            "무엇을 했고 어디까지 됐는지 사실만 쓴다. 한 문장, 사람이 수첩에 적듯 "
+            "(O: '로그인 화면 DBIO 3개 전환, 컴파일 통과' / X: '(1) … (2) … 다음 단계로 …'). "
+            "일을 실제로 시작할 때 join하고, 시작한 뒤에 남겨라 — 계획은 로그가 아니다."
         ),
     )
     def report_progress_tool(
@@ -309,7 +314,7 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
         name="complete_session",
         description=(
             "이 세션의 일이 끝났다고 보고한다. 타스크의 세션이 전부 완료면 타스크도 "
-            "`완료`가 된다. summary는 사람이 읽는 마무리 한 줄이다."
+            "`완료`가 된다. summary는 사람이 읽는 마무리 한 줄 — 무엇이 됐는지만, 한 문장."
         ),
     )
     def complete_session_tool(ctx: Context, summary: str) -> dict[str, Any]:
