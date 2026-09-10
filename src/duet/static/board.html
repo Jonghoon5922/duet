@@ -407,17 +407,17 @@ function ghost(label, onclick) {
 
 // 되돌릴 수 있는 것만 한 번 눌러 되게 뒀다. 닫기는 상태를 자동으로 되돌리면 풀리고,
 // 보관은 폴더를 옮길 뿐이라 되돌리기가 있다. 지우는 버튼은 두지 않는다.
-function footButtons(task) {
+function footButtons(task, row) {
+  const fold = ghost("▲ 접기", () => { row.open = false; });
   if (archived) {
-    return [ghost("되돌리기", () => act(`/api/tasks/${task.id}/unarchive`, `${task.id} 을(를) 보드로 되돌렸다`))];
+    return [ghost("보드로 되돌리기", () => act(`/api/tasks/${task.id}/unarchive`, `${task.id} 을(를) 보드로 되돌렸다`)), fold];
   }
   const out = [];
-  if (task.status !== "완료") {
-    out.push(ghost("닫기", () => act(`/api/tasks/${task.id}/close`, `${task.id} 을(를) 닫았다`)));
+  // 끝난 것만 치운다. 진행중인 걸 보관하면 살아 있는 세션의 경로가 끊긴다.
+  if (task.status === "완료" || task.status === "취소") {
+    out.push(ghost("보관함에 넣기", () => act(`/api/tasks/${task.id}/archive`, `${task.id} 을(를) 보관함에 넣었다`)));
   }
-  if (!task.counts["진행중"]) {
-    out.push(ghost("보관", () => act(`/api/tasks/${task.id}/archive`, `${task.id} 을(를) 보관함으로`)));
-  }
+  out.push(fold);
   return out;
 }
 
@@ -454,8 +454,10 @@ function taskRow(task) {
         el("span", { className: "proj" },
           editable(task, "project", task.project, task.project_override ? "" : "guessed")),
         el("span", { className: "mono", title: task.folder,
-                     textContent: when(task.last_activity) || "활동 없음" }),
-        el("span", { className: "acts" }, footButtons(task)))));
+                     textContent: task.last_activity ? `마지막 활동 ${when(task.last_activity)}` : "아직 활동 없음" }),
+        el("span", { className: "acts" }))));
+  // 푸터 버튼은 줄(row)이 만들어진 뒤에 넣는다 — 접기가 자기 줄을 닫아야 해서.
+  row.querySelector(".acts").append(...footButtons(task, row));
   row.ontoggle = () => { row.open ? opened.add(task.id) : opened.delete(task.id); };
   return row;
 }
