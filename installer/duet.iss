@@ -15,6 +15,7 @@
 #define AppPublisher "Jonghoon5922"
 #define AppURL "https://github.com/Jonghoon5922/duet"
 #define AppExe "duet.exe"
+#define BoardExe "duet-board.exe"
 
 [Setup]
 AppId={{B7E2D4A1-6C3F-4E9B-A2D8-5F1C7E3B9A64}
@@ -56,16 +57,18 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\dist\app\Duet\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+; 창 모드. 시작 메뉴에서 보드를 열 때 검은 창이 안 뜬다.
+Source: "..\dist\app\Duet\{#BoardExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\app\Duet\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "사용안내.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-; 보드. 콘솔 창 하나가 같이 뜨는데, 그 창을 닫으면 보드가 꺼진다 (창 모드 앱은 다음 단계).
-Name: "{group}\{#AppName} 보드"; Filename: "{app}\{#AppExe}"; Parameters: "ui"
+; 보드. 이미 떠 있으면(Claude 창이 겸하는 중) 브라우저만 열고, 아니면 띄운다. 검은 창 없음.
+Name: "{group}\{#AppName} 보드"; Filename: "{app}\{#BoardExe}"
 Name: "{group}\사용 안내"; Filename: "{app}\사용안내.txt"
 Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName} 보드"; Filename: "{app}\{#AppExe}"; Parameters: "ui"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName} 보드"; Filename: "{app}\{#BoardExe}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Parameters: "register claude-code"; StatusMsg: "Claude Code에 연결하는 중..."; Flags: runhidden waituntilterminated; Tasks: claudecode
@@ -102,8 +105,9 @@ begin
       'Duet 을 설치했습니다.' + #13#10 + #13#10 +
       '1. Claude Code 창을 새로 열면 Duet 이 붙습니다.' + #13#10 +
       '   평소처럼 일을 시키면 알아서 타스크에 기록됩니다.' + #13#10 + #13#10 +
-      '2. 시작 메뉴의 [Duet 보드] 를 누르면 보드가 열립니다.' + #13#10 +
-      '   같이 뜨는 검은 창을 닫으면 보드가 꺼집니다.' + #13#10 + #13#10 +
+      '2. Claude 창이 열려 있는 동안 보드는 늘 켜져 있습니다.' + #13#10 +
+      '   브라우저에서 http://127.0.0.1:8737 을 여세요.' + #13#10 +
+      '   시작 메뉴의 [Duet 보드] 를 눌러도 됩니다.' + #13#10 + #13#10 +
       '기록은 [내 사용자 폴더\.duet] 에 파일로 쌓입니다.';
   end;
 end;

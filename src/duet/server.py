@@ -322,6 +322,30 @@ def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
     return server
 
 
+def host_board_in_background() -> None:
+    """이 MCP 서버가 보드도 겸한다. Claude 창이 열려 있는 동안 보드는 늘 살아 있다.
+
+    창마다 이 프로세스가 뜨므로, 포트가 비어 있는 첫 프로세스가 보드를 맡고 나머지는
+    5초마다 다시 잡아 본다 — 맡은 창이 닫히면 다음 창이 이어받는다. 여기서 무슨 일이
+    나도 MCP 쪽은 건드리지 않는다. 그쪽이 본업이다.
+    """
+    import threading
+    import time
+
+    def run() -> None:
+        from . import web
+
+        while True:
+            try:
+                if web.is_port_free():
+                    web.serve_ui(open_browser=False)  # 내려갈 때까지 돌아오지 않는다
+            except Exception:
+                pass  # 포트 경합·바인드 실패·앱 오류. 조용히 다음 기회를 기다린다
+            time.sleep(5)
+
+    threading.Thread(target=run, name="duet-board", daemon=True).start()
+
+
 def serve() -> None:
     """이 함수가 도는 동안이 곧 세션 하나의 수명이다."""
     cur = Current(core.register_session(
@@ -355,6 +379,8 @@ def serve() -> None:
             pass  # 종료 경로다. 여기서 예외를 올리면 보이는 건 스택뿐이다
 
     threading.Thread(target=beat, name="duet-heartbeat", daemon=True).start()
+    if os.environ.get("DUET_NO_BOARD") != "1":
+        host_board_in_background()  # 시험에서는 끈다. 스모크가 프로세스를 여럿 띄운다
     atexit.register(close)
     try:
         create_server(cur, lock).run("stdio")

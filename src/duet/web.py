@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,8 @@ from . import __version__, core
 PAGE = Path(__file__).parent / "static" / "board.html"
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8737
+#: 딴 프로그램이 이 포트를 쓰면 DUET_PORT 로 바꾼다.
+DEFAULT_PORT = int(os.environ.get("DUET_PORT", "8737"))
 
 
 class StatusIn(BaseModel):
@@ -156,12 +158,65 @@ def create_app() -> FastAPI:
     return app
 
 
-def serve_ui(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
+def board_url(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> str:
+    return f"http://{host}:{port}"
+
+
+def is_port_free(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> bool:
+    """그 포트를 지금 잡을 수 있나. 이미 다른 Duet이 보드를 띄웠으면 False."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
+def serve_ui(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    open_browser: bool = True,
+    idle_minutes: float | None = None,
+) -> None:
+    """보드를 띄운다. 이 호출은 서버가 내려갈 때까지 돌아오지 않는다.
+
+    `idle_minutes` 를 주면 그 시간 동안 아무도 안 보면 스스로 내려간다 — 창 없는
+    실행 파일로 띄울 때 끄는 손이 없어서다. MCP 서버가 겸할 때는 주지 않는다
+    (그 프로세스는 Claude 창과 수명을 같이한다).
+
+    stdout에는 아무것도 쓰지 않는다. MCP 서버가 겸할 때 stdout은 프로토콜 통로다.
+    """
+    import threading
+    import time
+
     import uvicorn
 
+    app = create_app()
+    last_seen = {"t": time.monotonic()}
+
+    @app.middleware("http")
+    async def touch(request, call_next):  # noqa: ANN001
+        last_seen["t"] = time.monotonic()
+        return await call_next(request)
+
+    config = uvicorn.Config(
+        app, host=host, port=port, log_level="warning", log_config=None, access_log=False
+    )
+    server = uvicorn.Server(config)
+
+    if idle_minutes:
+        def watch() -> None:
+            while not server.should_exit:
+                time.sleep(15)
+                if time.monotonic() - last_seen["t"] > idle_minutes * 60:
+                    server.should_exit = True  # 아무도 안 본다. 조용히 내려간다
+        threading.Thread(target=watch, name="duet-board-idle", daemon=True).start()
+
     if open_browser:
-        import threading
         import webbrowser
 
-        threading.Timer(0.7, lambda: webbrowser.open(f"http://{host}:{port}")).start()
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+        threading.Timer(0.7, lambda: webbrowser.open(board_url(host, port))).start()
+
+    server.run()

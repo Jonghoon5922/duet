@@ -31,7 +31,7 @@ class Client:
         self.proc = subprocess.Popen(
             ["uv", "run", "duet", "serve"],
             cwd=PROJECT,
-            env=dict(os.environ, DUET_HOME=str(HOME), PYTHONIOENCODING="utf-8"),
+            env=dict(os.environ, DUET_HOME=str(HOME), PYTHONIOENCODING="utf-8", DUET_NO_BOARD="1"),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", bufsize=1,
         )

@@ -32,34 +32,43 @@ hiddenimports = [
     "pywintypes", "win32api", "win32con", "win32file",
 ] + collect_submodules("mcp")
 
-analysis = Analysis(
-    [str(SPEC_DIR / "launcher.py")],
-    pathex=[str(PROJECT / "src")],
-    binaries=[],
-    datas=datas,
-    hiddenimports=hiddenimports,
-    hookspath=[],
-    excludes=["tkinter", "pytest", "IPython", "matplotlib", "PIL"],
-    noarchive=False,
+def analyze(entry):
+    """두 진입점을 같은 조건으로 분석한다."""
+    return Analysis(
+        [str(SPEC_DIR / entry)],
+        pathex=[str(PROJECT / "src")],
+        binaries=[],
+        datas=datas,
+        hiddenimports=hiddenimports,
+        hookspath=[],
+        excludes=["tkinter", "pytest", "IPython", "matplotlib", "PIL"],
+        noarchive=False,
+    )
+
+
+# 실행 파일이 둘이다. 파이썬이 python.exe 와 pythonw.exe 로 나뉜 것과 같은 이유다.
+#   duet.exe        콘솔 모드. MCP는 stdin/stdout으로 대화하므로 콘솔이어야 한다
+#   duet-board.exe  창 모드. 시작 메뉴에서 보드를 열 때 검은 창이 안 뜨게
+mcp_analysis = analyze("launcher.py")
+board_analysis = analyze("board_launcher.py")
+
+mcp_exe = EXE(
+    PYZ(mcp_analysis.pure), mcp_analysis.scripts, [],
+    exclude_binaries=True, name="duet",
+    debug=False, strip=False, upx=False,
+    console=True,
+)
+board_exe = EXE(
+    PYZ(board_analysis.pure), board_analysis.scripts, [],
+    exclude_binaries=True, name="duet-board",
+    debug=False, strip=False, upx=False,
+    console=False,
 )
 
-exe = EXE(
-    PYZ(analysis.pure),
-    analysis.scripts,
-    [],
-    exclude_binaries=True,
-    name="duet",
-    debug=False,
-    strip=False,
-    upx=False,
-    console=True,  # stdio가 MCP 통로다. 콘솔 모드여야 표준 입출력이 있다
-)
-
+# 무거운 자원(_internal)은 한 벌. 양쪽 분석 결과를 합쳐 빠지는 것이 없게 한다.
 COLLECT(
-    exe,
-    analysis.binaries,
-    analysis.datas,
-    strip=False,
-    upx=False,
-    name="Duet",
+    mcp_exe, board_exe,
+    mcp_analysis.binaries + board_analysis.binaries,
+    mcp_analysis.datas + board_analysis.datas,
+    strip=False, upx=False, name="Duet",
 )
