@@ -79,7 +79,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .spacer{flex:1}
 .search{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;min-width:220px}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.grid{display:flex;flex-direction:column;gap:14px}
 .group{grid-column:1/-1;margin:10px 0 -4px;font-size:13px;font-weight:600;letter-spacing:.01em;
        display:flex;align-items:baseline;gap:8px}
 .group:first-child{margin-top:0}
@@ -160,6 +160,31 @@ dialog h2{margin:0 0 14px;font-size:16px}
 .toast.show{opacity:1}
 @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.wrap{padding:18px 14px 60px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* 프로젝트 상자 */
+.pcard{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.phead{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
+.phead h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.here{font-size:11px;color:var(--진행중);background:var(--진행중-bg);padding:1px 8px;border-radius:999px}
+.pc{font-size:12px;color:var(--ink-3)}
+.tag.s-대기{color:var(--대기);background:var(--대기-bg)}
+
+/* 타스크 줄 */
+.trow{border-bottom:1px solid var(--line-2)}
+.trow:last-child{border-bottom:0}
+.trow summary{display:flex;align-items:center;gap:10px;padding:9px 16px 9px 12px;list-style:none;cursor:pointer}
+.trow summary::-webkit-details-marker{display:none}
+.trow summary:hover{background:var(--panel-2)}
+.trow .stripe{width:4px;height:22px;margin:0;border-radius:2px;flex:none}
+.trow .title{font-size:14px;line-height:1.3}
+.trow.s-완료 .title{color:var(--ink-3)}
+.trow .cnt{font-size:12px;color:var(--ink-3);flex:none}
+.warn-dot{color:var(--대기);flex:none}
+.tbody{padding:6px 16px 10px 30px;background:var(--bg)}
+.tbody .desc,.tbody .meta,.tbody .warn,.tbody .foot{padding-left:0;padding-right:0}
+.tbody .sessions{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;margin-bottom:8px}
+.tbody .foot{border-top:0;padding-top:2px}
+.empty{grid-column:auto}
 </style>
 </head>
 <body>
@@ -371,31 +396,57 @@ function footButtons(task) {
   return out;
 }
 
-function card(task) {
+// 타스크 한 줄. 누르면 설명·세션·손잡이가 펼쳐진다.
+function taskRow(task) {
   const total = task.sessions.length;
   const done = task.counts["완료"];
   const pct = total ? Math.round(100 * done / total) : 0;
 
-  // id는 편집 칸 밖에 둔다. 안에 넣으면 제목을 고칠 때 그 글자까지 같이 보내게 된다.
-  return el("article", { className: `task s-${task.status}` },
-    el("div", { className: "head" },
+  // summary 안의 편집 칸·드롭다운은 누를 때 펼침이 같이 토글되지 않게 막는다.
+  const title = editable(task, "title", task.title, "title");
+  title.onclick = (e) => e.stopPropagation();
+  const sel = statusSelect(task);
+  sel.onclick = (e) => e.stopPropagation();
+
+  const row = el("details", { className: `trow s-${task.status}`, open: opened.has(task.id) },
+    el("summary", {},
       el("span", { className: "stripe", style: `background:var(--${task.status})` }),
       el("span", { className: "tid mono", textContent: task.id }),
-      editable(task, "title", task.title, "title"),
-      statusSelect(task)),
-    el("div", { className: "desc" }, editable(task, "description", task.description, "")),
-    el("div", { className: "meta" },
-      el("span", { className: "mono", textContent: `세션 ${done}/${total} 완료` }),
-      el("span", { className: "progress" }, el("i", { style: `width:${pct}%` })),
-      el("span", { className: "mono", textContent: `${pct}%` })),
-    task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
-    total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
-    el("div", { className: "foot" },
-      el("span", { className: "proj" },
-        editable(task, "project", task.project, task.project_override ? "" : "guessed")),
-      el("span", { className: "mono", title: task.folder,
-                   textContent: when(task.last_activity) || "활동 없음" }),
-      el("span", { className: "acts" }, footButtons(task))));
+      title,
+      task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
+      el("span", { className: "cnt mono", title: "세션 완료/전체", textContent: `${done}/${total}` }),
+      sel),
+    el("div", { className: "tbody" },
+      el("div", { className: "desc" }, editable(task, "description", task.description, "")),
+      el("div", { className: "meta" },
+        el("span", { className: "mono", textContent: `세션 ${done}/${total} 완료` }),
+        el("span", { className: "progress" }, el("i", { style: `width:${pct}%` })),
+        el("span", { className: "mono", textContent: `${pct}%` })),
+      task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
+      total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
+      el("div", { className: "foot" },
+        el("span", { className: "proj" },
+          editable(task, "project", task.project, task.project_override ? "" : "guessed")),
+        el("span", { className: "mono", title: task.folder,
+                     textContent: when(task.last_activity) || "활동 없음" }),
+        el("span", { className: "acts" }, footButtons(task)))));
+  row.ontoggle = () => { row.open ? opened.add(task.id) : opened.delete(task.id); };
+  return row;
+}
+
+// 프로젝트 하나가 상자 하나. 그 안에 타스크가 줄로 들어간다.
+function projectCard(name, list) {
+  const running = list.filter((t) => t.status === "진행중").length;
+  const attention = list.filter((t) => t.warning).length;
+  return el("article", { className: "pcard" },
+    el("div", { className: "phead" },
+      el("h2", { textContent: name || "프로젝트 모름" }),
+      name && name === here ? el("span", { className: "here", textContent: "지금 이 폴더" }) : null,
+      el("span", { className: "spacer" }),
+      running ? el("span", { className: "tag s-진행중", textContent: `진행중 ${running}` }) : null,
+      attention ? el("span", { className: "tag s-대기", textContent: `확인 ${attention}` }) : null,
+      el("span", { className: "pc mono", textContent: `타스크 ${list.length}` })),
+    el("div", { className: "trows" }, list.map(taskRow)));
 }
 
 /* ---------- 그리기 ---------- */
@@ -458,15 +509,9 @@ function draw() {
     return a.localeCompare(b, "ko");
   });
 
-  const sections = order.flatMap((key) => [
-    el("h2", { className: "group" },
-      el("span", { textContent: key || "프로젝트 모름" }),
-      el("span", { className: "n mono", textContent: String(groups.get(key).length) }),
-      key && key === here ? el("span", { className: "n", textContent: "· 지금 이 폴더" }) : null),
-    ...groups.get(key).map(card),
-  ]);
+  const cards = order.map((key) => projectCard(key, groups.get(key)));
 
-  $("#grid").replaceChildren(...(shown.length ? sections : [
+  $("#grid").replaceChildren(...(shown.length ? cards : [
     el("div", { className: "empty", textContent: tasks.length
       ? "조건에 맞는 타스크가 없다."
       : archived ? "보관함이 비어 있다." : "아직 타스크가 없다. 오른쪽 위 + 새 타스크로 시작한다." }),
