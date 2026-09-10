@@ -204,7 +204,7 @@ dialog h2{margin:0 0 14px;font-size:16px}
       <div class="sub">
         <span><span class="pulse" id="pulse"></span> <span id="state">읽는 중</span></span>
         <span>·</span><span class="mono" id="home"></span>
-        <span>·</span><span>세션이 전부 완료되면 타스크도 완료</span>
+        <span>·</span><span>세션이 전부 끝나면 타스크도 완료됩니다</span>
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -223,9 +223,9 @@ dialog h2{margin:0 0 14px;font-size:16px}
 
   <div class="grid" id="grid"></div>
   <p class="hint">
-    타스크 줄을 누르면 펼쳐진다. 제목과 설명은 클릭해서 고친다. 상태는 세션에서 저절로 정해지고,
-    드롭다운에서 고르면 그것이 상태가 된다 (🔒). 🔒를 누르면 다시 세션에서 센다.<br>
-    세션 줄은 사람이 만들지 않는다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓는다. 세션을 눌러 펼치면 그 로그가 나온다.
+    타스크 줄을 누르면 펼쳐집니다. 제목과 설명은 클릭해서 고칩니다. 상태는 세션에 따라 자동으로 정해지고,
+    드롭다운에서 고르면 그대로 고정됩니다 (🔒). 🔒를 누르면 다시 자동으로 돌아갑니다.<br>
+    세션 줄은 사람이 만들지 않습니다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓습니다. 세션을 누르면 그 로그가 펼쳐집니다.
   </p>
 </div>
 
@@ -285,7 +285,8 @@ function toast(message) {
 function statusSelect(task) {
   // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
   // "계산값이냐 사람이 정한 값이냐"는 내부 사정이라 화면에 올리지 않는다 — 🔒 하나로 족하다.
-  const sel = el("select", { className: `sel s-${slug(task.status)}`, title: "상태" });
+  const sel = el("select", { className: `sel s-${slug(task.status)}`,
+    title: "상태. 고르면 그대로 고정됩니다 (🔒). 고르지 않으면 세션에 따라 자동으로 정해집니다." });
   if (!HUMAN.includes(task.status)) {
     // 확인 필요: 지금 상태로 보이되 고를 수는 없다.
     sel.append(el("option", { value: "", textContent: task.status, selected: true, disabled: true }));
@@ -312,7 +313,7 @@ function unlockButton(task) {
   if (!task.override) return null;
   const button = el("button", {
     className: "lock", type: "button", textContent: "🔒",
-    title: "사람이 정한 상태다. 누르면 다시 세션에서 센다",
+    title: "직접 정한 상태입니다. 세션이 바뀌어도 그대로 둡니다. 누르면 자동으로 돌아갑니다.",
   });
   button.onclick = async (e) => {
     e.stopPropagation();
@@ -322,7 +323,7 @@ function unlockButton(task) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status: null }),
       });
-      toast(`${task.id} → 다시 세션에서 센다`);
+      toast(`${task.id} 상태를 자동으로 돌렸습니다`);
       refresh(true);
     } catch (err) { toast(err.message); }
   };
@@ -361,7 +362,7 @@ function editable(task, field, text, className) {
 function sessionControl(task, s) {
   if (s.alive) return el("span", { className: `tag s-${s.status}`, textContent: s.status });
 
-  const sel = el("select", { className: `sel s-${s.status}`, title: "사람이 이 세션을 어떻게 볼지 정한다" });
+  const sel = el("select", { className: `sel s-${s.status}`, title: "끊긴 세션을 완료로 칠지 정합니다" });
   for (const v of ["완료", "중지"]) {
     sel.append(el("option", { value: v, textContent: v, selected: s.status === v }));
   }
@@ -399,11 +400,11 @@ function sessionRow(task, s) {
       el("span", { className: "sd" }),
       el("span", { className: "nm" },
         el("b", { textContent: s.title || s.id }),
-        el("span", { textContent: `${s.client} · ${s.alive ? "살아 있음" : when(s.heartbeat)}` })),
-      s.by_human ? el("span", { className: "locked", title: "사람이 정한 상태", textContent: "🔒" }) : null,
+        el("span", { textContent: `${s.client} · ${s.alive ? "작업 중" : when(s.heartbeat)}` })),
+      s.by_human ? el("span", { className: "locked", title: "직접 정한 상태", textContent: "🔒" }) : null,
       sessionControl(task, s)),
     el("ul", { className: "log" },
-      logs.length ? logs : el("li", { className: "none" }, "아직 보고가 없다")));
+      logs.length ? logs : el("li", { className: "none" }, "아직 보고가 없습니다")));
   row.ontoggle = () => { row.open ? opened.add(s.id) : opened.delete(s.id); };
   return row;
 }
@@ -556,8 +557,8 @@ function draw() {
 
   $("#grid").replaceChildren(...(shown.length ? cards : [
     el("div", { className: "empty", textContent: tasks.length
-      ? "조건에 맞는 타스크가 없다."
-      : archived ? "보관함이 비어 있다." : "아직 타스크가 없다. 오른쪽 위 + 새 타스크로 시작한다." }),
+      ? "조건에 맞는 타스크가 없습니다."
+      : archived ? "보관함이 비어 있습니다." : "아직 타스크가 없습니다. 오른쪽 위 + 새 타스크로 시작하세요." }),
   ]));
 }
 
@@ -574,7 +575,7 @@ async function refresh(force = false) {
     const data = await api(archived ? "/api/archive" : "/api/tasks");
     $("#home").textContent = data.home;
     $("#pulse").classList.add("on");
-    $("#state").textContent = archived ? "보관함을 보고 있다" : "폴더를 읽고 있다";
+    $("#state").textContent = archived ? "보관함" : "폴더를 읽고 있습니다";
     $("#archive").textContent = data.archived ? `보관함 ${data.archived}` : "보관함";
     here = data.here || "";
 
@@ -585,7 +586,7 @@ async function refresh(force = false) {
     draw();
   } catch (e) {
     $("#pulse").classList.remove("on");
-    $("#state").textContent = `읽지 못했다: ${e.message}`;
+    $("#state").textContent = `읽지 못했습니다: ${e.message}`;
   }
 }
 
