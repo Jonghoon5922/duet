@@ -103,21 +103,26 @@ joined = a.tool("join_task", {"task_id": task_id, "session_title": "DBIO 계층 
 check("A join → 타스크 진행중", joined["task"]["status"] == "진행중", str(joined["task"]["counts"]))
 a.tool("report_progress", {"message": "DBIO 12개 중 5개 전환", "percent": 40})
 
-# 세션 B: 같은 타스크에 붙는다
+# 세션 B: A가 살아 있는 동안은 같은 타스크에 못 붙는다
 b = Client("claude-ai")
 check("B의 instructions에 열린 타스크가 보인다", f"[{task_id}] pc101pm 전환" in b.instructions,
       [ln for ln in b.instructions.splitlines() if ln.startswith(f"- [{task_id}]")][0])
-b.tool("join_task", {"task_id": task_id, "session_title": "Bean 계층 전환"})
+blocked = b.tool("join_task", {"task_id": task_id, "session_title": "Bean 계층 전환"})
+check("진행중인 타스크에는 같이 못 붙는다", "이미 살아 있는 세션" in blocked.get("error", ""),
+      blocked.get("error", "")[:60])
+
+# A가 끝내면 타스크는 일단 완료. B가 이어받으면 다시 진행중.
+check("A 완료 → 세션 하나뿐이니 타스크 완료",
+      a.tool("complete_session", {"summary": "DBIO 끝"})["task"]["status"] == "완료")
+joined_b = b.tool("join_task", {"task_id": task_id, "session_title": "Bean 계층 전환"})
+check("앞 세션이 끝난 뒤엔 이어받는다 → 다시 진행중", joined_b["task"]["status"] == "진행중")
 b.tool("report_progress", {"message": "Bean 8개 전환", "percent": 80})
 
-check("세션 2개가 각자 클라이언트 이름으로 붙었다",
+check("세션 2개가 각자 클라이언트 이름으로 남았다",
       [s.client for s in core.get_task(task_id).sessions] == ["Claude Code", "Claude Desktop"])
 check("세션이 붙고 보고해도 task.md는 그대로다 (충돌 없음)",
       (core.find_task(task_id) / "task.md").read_text(encoding="utf-8") == md_before)
 
-# 둘 다 끝내면 타스크가 닫힌다
-check("A 완료 → 타스크는 아직 진행중",
-      a.tool("complete_session", {"summary": "DBIO 끝"})["task"]["status"] == "진행중")
 done = b.tool("complete_session", {"summary": "Bean 끝"})
 check("B 완료 → 타스크 자동 완료", done["task"]["status"] == "완료", done.get("note", ""))
 

@@ -489,8 +489,34 @@ def join(session: Session, task_id: str | int, title: str = "") -> Task:
     프로젝트 것인지는 읽는 쪽이 세션에서 계산한다 — 상태와 같은 방식이다.
     """
     if session.status in CLOSED:
-        raise DuetError("이미 끝난 세션이다. 새 세션에서 참여하라.")
+        # 세션 하나는 타스크 하나다. 끝냈으면 이 창은 끝이고, 다른 일은 새 창에서 한다.
+        done = task_of(session)
+        where = f"[{done.id}] {done.title}을(를)" if done else "일을"
+        raise DuetError(
+            f"이 세션은 {where} 이미 끝냈다. 세션 하나는 타스크 하나다 — "
+            "다른 일은 새 창에서 시작하라고 사용자에게 말하라."
+        )
+    current = task_of(session)
+    if current is not None and session.progress:
+        # 보고까지 한 뒤에 옮기면 그 로그가 엉뚱한 타스크에 남는다. 보고 전이면 잘못 붙은
+        # 것일 수 있으니 옮겨 준다.
+        raise DuetError(
+            f"이 세션은 이미 [{current.id}] {current.title}에 붙어 보고까지 했다. "
+            "세션 하나는 타스크 하나다."
+        )
     task_dir = find_task(task_id)
+
+    # 타스크 하나에는 살아 있는 세션 하나만. 두 창이 같은 일을 동시에 하면 같은 코드를
+    # 동시에 건드린다. 이어받기는 앞 세션이 끝나거나 멈춘 뒤다.
+    others = [s for s in read_sessions(task_dir) if s.id != session.id and s.alive]
+    if others:
+        busy = others[0]
+        raise DuetError(
+            f"[{TASK_DIR.match(task_dir.name).group(1)}]에는 이미 살아 있는 세션이 있다: "
+            f"'{busy.title or busy.id}' ({busy.client}). 타스크 하나에는 세션 하나만 붙는다 — "
+            "그 세션이 끝나거나 멈춘 뒤에 이어받는다. 같은 일을 다른 창에서 하고 있는 게 "
+            "아닌지 사용자에게 확인하라."
+        )
 
     old = session.path
     session.title = title.strip() or session.title

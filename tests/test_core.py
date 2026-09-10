@@ -38,22 +38,25 @@ def test_참여하면_세션_파일이_타스크로_옮겨간다():
 
 
 def test_세션이_전부_완료면_타스크가_완료로_계산된다():
+    """A가 끝낸 뒤 B가 이어받는다. 둘 다 완료면 타스크도 완료."""
     task = core.create_task("전환")
-    a, b = core.register_session(), core.register_session()
+    a = core.register_session()
     core.join(a, task.id, "DBIO")
-    core.join(b, task.id, "Bean")
+    assert core.finish(a, core.DONE, "DBIO 끝").status == core.DONE, "세션 하나뿐이면 그것으로 완료"
 
-    assert core.finish(a, core.DONE, "DBIO 끝").status == core.RUNNING, "아직 b가 남았다"
+    b = core.register_session()
+    assert core.join(b, task.id, "Bean").status == core.RUNNING, "이어받으면 다시 진행중"
     assert core.finish(b, core.DONE, "Bean 끝").status == core.DONE
 
 
 def test_중지가_섞이면_완료로_계산하지_않는다():
     task = core.create_task("전환")
-    a, b = core.register_session(), core.register_session()
+    a = core.register_session()
     core.join(a, task.id)
-    core.join(b, task.id)
-
     core.finish(a, core.DONE, "끝")
+
+    b = core.register_session()
+    core.join(b, task.id)
     after = core.finish(b, core.STOPPED, "여기까지")
 
     assert after.status == core.RUNNING, "사람이 판단하도록 열어 둔다"
@@ -217,10 +220,11 @@ def test_잘못된_세션_변경은_거부한다():
 
 def test_타스크를_닫으면_남은_세션이_중지로_적힌다():
     task = core.create_task("전환")
-    a, b = core.register_session(), core.register_session()
+    a = core.register_session()
     core.join(a, task.id, "끝낸 것")
-    core.join(b, task.id, "안 끝낸 것")
     core.finish(a, core.DONE, "끝")
+    b = core.register_session()
+    core.join(b, task.id, "안 끝낸 것")
     _stale(b)  # 죽었는데 아직 안 걷힌 세션
 
     after = core.close_task(task.id)
@@ -380,3 +384,41 @@ def test_비슷한_타스크를_찾아준다():
     assert [t.title for t in core.similar_tasks("대시보드 필터 만들기")] == ["대시보드 만들기"]
     assert core.similar_tasks("세션 타임라인 고치기") == [], "닫힌 것은 후보가 아니다"
     assert core.similar_tasks("전혀 다른 일") == []
+
+
+def test_진행중인_타스크에는_같이_못_붙는다():
+    """두 창이 같은 일을 동시에 하면 같은 코드를 동시에 건드린다."""
+    task = core.create_task("전환")
+    a = core.register_session("Claude Code")
+    core.join(a, task.id, "DBIO 계층 전환")
+
+    b = core.register_session("Claude Desktop")
+    with pytest.raises(core.DuetError, match="이미 살아 있는 세션"):
+        core.join(b, task.id, "Bean 계층 전환")
+
+    core.finish(a, core.DONE, "끝")
+    assert core.join(b, task.id, "Bean 계층 전환").status == core.RUNNING, "끝난 뒤엔 이어받는다"
+
+
+def test_앞_세션이_죽어_있으면_이어받을_수_있다():
+    """살아 있는 것만 막는다. 하트비트가 끊긴 세션은 자리를 비운 것이다."""
+    task = core.create_task("전환")
+    a = core.register_session()
+    core.join(a, task.id)
+    _stale(a)
+
+    b = core.register_session()
+    assert core.join(b, task.id).counts[core.RUNNING] == 1
+
+
+def test_보고_전이면_다른_타스크로_옮길_수_있다():
+    """잘못 붙은 것을 되돌릴 길은 남긴다. 보고를 했으면 그 로그가 있으니 못 옮긴다."""
+    first, second = core.create_task("하나"), core.create_task("둘")
+    s = core.register_session()
+    core.join(s, first.id)
+    core.join(s, second.id)
+    assert core.get_task(first.id).sessions == [] and len(core.get_task(second.id).sessions) == 1
+
+    core.report(s, "둘에서 한 줄")
+    with pytest.raises(core.DuetError, match="보고까지 했다"):
+        core.join(s, first.id)
