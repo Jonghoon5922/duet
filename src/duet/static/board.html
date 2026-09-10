@@ -33,6 +33,8 @@
   }
 }
 *{box-sizing:border-box}
+/* display를 명시한 요소는 hidden 속성만으로 안 숨는다 (.stats가 grid라 그랬다) */
+[hidden]{display:none!important}
 body{
   margin:0; background:var(--bg); color:var(--ink); font-size:14px; line-height:1.5;
   font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
@@ -53,6 +55,10 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .btn:hover{background:var(--panel-2)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-3);padding:3px 8px;font-size:11.5px}
+.btn.ghost:hover{background:var(--panel-2);color:var(--ink)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.acts{display:flex;gap:2px}
 
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
 .stat{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);padding:12px 14px 12px 18px;
@@ -104,7 +110,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .sessions{border-top:1px solid var(--line-2)}
 .sess{border-bottom:1px solid var(--line-2)}
 .sess:last-child{border-bottom:0}
-.sess summary{display:grid;grid-template-columns:18px 1fr auto;gap:8px;align-items:center;padding:8px 12px 8px 16px;list-style:none}
+.sess summary{display:grid;grid-template-columns:18px 1fr auto auto;gap:8px;align-items:center;padding:8px 12px 8px 16px;list-style:none}
 .sess summary::-webkit-details-marker{display:none}
 .sess summary:hover{background:var(--panel-2)}
 .sd{width:8px;height:8px;border-radius:50%;justify-self:center;background:var(--중지)}
@@ -113,6 +119,7 @@ h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .nm{min-width:0;display:flex;flex-direction:column;line-height:1.3}
 .nm b{font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nm span{font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.locked{font-size:10px;color:var(--ink-3)}
 .sess.s-완료 .nm b{color:var(--ink-3)}
 .tag{font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap}
 .tag.s-진행중{color:var(--진행중);background:var(--진행중-bg)}
@@ -155,7 +162,10 @@ dialog h2{margin:0 0 14px;font-size:16px}
         <span>·</span><span>세션이 전부 완료되면 타스크도 완료</span>
       </div>
     </div>
-    <button class="btn primary" id="new">+ 새 타스크</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="archive" aria-pressed="false">보관함</button>
+      <button class="btn primary" id="new">+ 새 타스크</button>
+    </div>
   </header>
 
   <div class="stats" id="stats"></div>
@@ -192,6 +202,7 @@ const STATUSES = ["대기", "진행중", "완료", "중지", "취소"];
 let tasks = [];
 let filter = "전체";
 let query = "";
+let archived = false;   // 보관함을 보고 있나
 let drawn = null;   // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
 const opened = new Set();  // 펼쳐 둔 세션 id
 
@@ -267,7 +278,33 @@ function editable(task, field, text, className) {
   return node;
 }
 
-function sessionRow(s) {
+// 끝난 세션만 사람이 바꾼다. 살아 있는 세션은 그 프로세스가 자기 파일의 주인이라
+// 태그만 보여주고 손대지 못하게 한다.
+function sessionControl(task, s) {
+  if (s.alive) return el("span", { className: `tag s-${s.status}`, textContent: s.status });
+
+  const sel = el("select", { className: `sel s-${s.status}`, title: "사람이 이 세션을 어떻게 볼지 정한다" });
+  for (const v of ["완료", "중지"]) {
+    sel.append(el("option", { value: v, textContent: v, selected: s.status === v }));
+  }
+  // summary 안에 있는 컨트롤이라, 막지 않으면 누를 때마다 펼침이 같이 토글된다.
+  sel.onclick = (e) => e.stopPropagation();
+  sel.onchange = async (e) => {
+    e.stopPropagation();
+    try {
+      await api(`/api/tasks/${task.id}/sessions/${s.id}/status`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: sel.value }),
+      });
+      toast(`${s.title || s.id} → ${sel.value}`);
+      refresh(true);
+    } catch (err) { toast(err.message); refresh(true); }
+  };
+  return sel;
+}
+
+function sessionRow(task, s) {
   const logs = s.progress.map((p) => el("li", {},
     el("time", { className: "mono", textContent: when(p.t) }),
     el("span", { textContent: p.msg + (p.pct != null ? ` (${p.pct}%)` : "") })));
@@ -285,11 +322,40 @@ function sessionRow(s) {
       el("span", { className: "nm" },
         el("b", { textContent: s.title || s.id }),
         el("span", { textContent: `${s.client} · ${s.alive ? "살아 있음" : when(s.heartbeat)}` })),
-      el("span", { className: `tag s-${s.status}`, textContent: s.status })),
+      s.by_human ? el("span", { className: "locked", title: "사람이 정한 상태", textContent: "🔒" }) : null,
+      sessionControl(task, s)),
     el("ul", { className: "log" },
       logs.length ? logs : el("li", { className: "none" }, "아직 보고가 없다")));
   row.ontoggle = () => { row.open ? opened.add(s.id) : opened.delete(s.id); };
   return row;
+}
+
+async function act(path, message) {
+  try {
+    const body = await api(path, { method: "POST", headers: { "content-type": "application/json" } });
+    toast(body.note || message);
+    refresh(true);
+  } catch (e) { toast(e.message); }
+}
+
+function ghost(label, onclick) {
+  return el("button", { className: "btn ghost", type: "button", textContent: label, onclick });
+}
+
+// 되돌릴 수 있는 것만 한 번 눌러 되게 뒀다. 닫기는 상태를 자동으로 되돌리면 풀리고,
+// 보관은 폴더를 옮길 뿐이라 되돌리기가 있다. 지우는 버튼은 두지 않는다.
+function footButtons(task) {
+  if (archived) {
+    return [ghost("되돌리기", () => act(`/api/tasks/${task.id}/unarchive`, `${task.id} 을(를) 보드로 되돌렸다`))];
+  }
+  const out = [];
+  if (task.status !== "완료") {
+    out.push(ghost("닫기", () => act(`/api/tasks/${task.id}/close`, `${task.id} 을(를) 닫았다`)));
+  }
+  if (!task.counts["진행중"]) {
+    out.push(ghost("보관", () => act(`/api/tasks/${task.id}/archive`, `${task.id} 을(를) 보관함으로`)));
+  }
+  return out;
 }
 
 function card(task) {
@@ -310,10 +376,11 @@ function card(task) {
       el("span", { className: "progress" }, el("i", { style: `width:${pct}%` })),
       el("span", { className: "mono", textContent: `${pct}%` })),
     task.warning ? el("div", { className: "warn", textContent: `⚠ ${task.warning}` }) : null,
-    total ? el("div", { className: "sessions" }, task.sessions.map(sessionRow)) : null,
+    total ? el("div", { className: "sessions" }, task.sessions.map((s) => sessionRow(task, s))) : null,
     el("div", { className: "foot" },
-      el("span", { className: "path mono", title: task.folder, textContent: task.folder.split(/[\\/]/).pop() }),
-      el("span", { className: "mono", textContent: when(task.last_activity) || "활동 없음" })));
+      el("span", { className: "mono", title: task.folder,
+                   textContent: when(task.last_activity) || "활동 없음" }),
+      el("span", { className: "acts" }, footButtons(task))));
 }
 
 /* ---------- 그리기 ---------- */
@@ -366,7 +433,7 @@ function draw() {
   $("#grid").replaceChildren(...(shown.length ? shown.map(card) : [
     el("div", { className: "empty", textContent: tasks.length
       ? "조건에 맞는 타스크가 없다."
-      : "아직 타스크가 없다. 오른쪽 위 + 새 타스크로 시작한다." }),
+      : archived ? "보관함이 비어 있다." : "아직 타스크가 없다. 오른쪽 위 + 새 타스크로 시작한다." }),
   ]));
 }
 
@@ -380,12 +447,13 @@ function busy() {
 
 async function refresh(force = false) {
   try {
-    const data = await api("/api/tasks");
+    const data = await api(archived ? "/api/archive" : "/api/tasks");
     $("#home").textContent = data.home;
     $("#pulse").classList.add("on");
-    $("#state").textContent = "폴더를 읽고 있다";
+    $("#state").textContent = archived ? "보관함을 보고 있다" : "폴더를 읽고 있다";
+    $("#archive").textContent = data.archived ? `보관함 ${data.archived}` : "보관함";
 
-    const shape = JSON.stringify(data.tasks);
+    const shape = JSON.stringify([archived, data.tasks]);
     if (!force && (busy() || shape === drawn)) return;
     drawn = shape;
     tasks = data.tasks;
@@ -397,6 +465,14 @@ async function refresh(force = false) {
 }
 
 $("#q").addEventListener("input", (e) => { query = e.target.value; draw(); });
+$("#archive").addEventListener("click", (e) => {
+  archived = !archived;
+  e.currentTarget.setAttribute("aria-pressed", String(archived));
+  // 보관함에는 집계 타일이 뜻이 없다. 이미 다 끝난 것들이다.
+  $("#stats").hidden = archived;
+  filter = "전체";
+  refresh(true);
+});
 $("#new").addEventListener("click", () => { $("#frm").reset(); $("#dlg").showModal(); $("#fTitle").focus(); });
 $("#fCancel").addEventListener("click", () => $("#dlg").close());
 // 한글 입력 중의 Enter는 IME가 조합을 끝내는 데 쓴다. 그 Enter로 폼이 넘어가면 안 되고,

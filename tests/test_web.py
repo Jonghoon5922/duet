@@ -98,3 +98,25 @@ def test_목록에_세션과_로그가_함께_온다(client):
     row = client.get("/api/tasks").json()["tasks"][0]
     assert row["sessions"][0]["progress"][0]["msg"] == "설계서 훑음"
     assert row["folder"].endswith(task.dir.name)
+
+
+def test_화면에서_중지_세션을_완료로_바꾼다(client):
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+    core.finish(s, core.STOPPED, "여기까지")
+
+    body = client.post(f"/api/tasks/{task.id}/sessions/{s.id}/status", json={"status": "완료"}).json()
+    assert body["status"] == core.DONE, "타스크가 스스로 닫힌다"
+    assert body["sessions"][0]["by_human"] is True
+    assert body["override"] is None
+
+
+def test_살아있는_세션_변경은_거부한다(client):
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+
+    res = client.post(f"/api/tasks/{task.id}/sessions/{s.id}/status", json={"status": "완료"})
+    assert res.status_code == 400
+    assert "살아 있는" in res.json()["detail"]

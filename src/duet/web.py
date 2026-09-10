@@ -54,7 +54,12 @@ def create_app() -> FastAPI:
         # 카드가 세션 줄까지 그리므로 상세째로 준다. 어차피 list_tasks가 세션 파일을
         # 이미 읽었다 — 개인용 규모에서 2초마다 이걸 보내도 무겁지 않다.
         rows = [t.to_detail() for t in core.list_tasks(status)]
-        return {"tasks": rows, "statuses": list(core.TASK_STATUSES), "home": str(core.home())}
+        return {
+            "tasks": rows,
+            "statuses": list(core.TASK_STATUSES),
+            "home": str(core.home()),
+            "archived": len(core.archived_dirs()),
+        }
 
     @app.post("/api/tasks", status_code=201)
     def new_task(body: TaskIn) -> dict[str, Any]:
@@ -70,6 +75,57 @@ def create_app() -> FastAPI:
         """제목·설명 인라인 편집. 사람이 정한 상태는 건드리지 않는다."""
         try:
             return core.update_task(task_id, body.title, body.description).to_detail()
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/api/archive")
+    def archive() -> dict[str, Any]:
+        rows = [t.to_detail() for t in core.list_archived()]
+        return {"tasks": rows, "archived": len(rows), "home": str(core.home())}
+
+    @app.post("/api/tasks/{task_id}/archive")
+    def archive_task(task_id: str) -> dict[str, Any]:
+        try:
+            return core.archive_task(task_id).to_detail()
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/tasks/{task_id}/unarchive")
+    def unarchive_task(task_id: str) -> dict[str, Any]:
+        try:
+            return core.unarchive_task(task_id).to_detail()
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/api/tasks/{task_id}/close")
+    def close_task(task_id: str) -> dict[str, Any]:
+        """이 타스크를 닫는다. 살아 있는 세션은 그대로 두고 알려만 준다."""
+        try:
+            task = core.close_task(task_id)
+        except core.DuetError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except OSError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        alive = task.counts[core.RUNNING]
+        return task.to_detail() | {
+            "note": f"살아 있는 세션 {alive}개는 그대로 둔다. 그 창을 닫으면 스스로 중지로 적힌다."
+            if alive else "닫았다."
+        }
+
+    @app.post("/api/tasks/{task_id}/sessions/{session_id}/status")
+    def set_session_status(task_id: str, session_id: str, body: StatusIn) -> dict[str, Any]:
+        """끝난 세션을 사람이 완료/중지로 바꾼다. 살아 있는 세션은 거부된다."""
+        if body.status is None:
+            raise HTTPException(status_code=400, detail="세션은 자동으로 되돌릴 수 없다.")
+        try:
+            return core.set_session_status(task_id, session_id, body.status).to_detail()
         except core.DuetError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except OSError as e:

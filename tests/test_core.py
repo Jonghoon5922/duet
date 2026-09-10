@@ -173,3 +173,122 @@ def test_제목과_설명을_고쳐도_폴더와_상태는_그대로다():
     assert core.update_task(task.id, description="새 설명").description == "새 설명"
     with pytest.raises(core.DuetError):
         core.update_task(task.id, title="   ")
+
+
+def test_끝난_세션은_사람이_상태를_바꾼다():
+    """중지 세션을 완료로 바꾸면 타스크가 스스로 닫힌다 — 상태를 덮지 않고."""
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+    core.finish(s, core.STOPPED, "여기까지")
+    assert core.get_task(task.id).status == core.RUNNING
+
+    after = core.set_session_status(task.id, s.id, core.DONE)
+    assert after.status == core.DONE, "자동 규칙이 다시 센다"
+    assert after.override is None, "타스크 상태를 덮지 않았다"
+    assert after.sessions[0].by_human is True
+    assert after.sessions[0].summary == "여기까지", "그 세션이 남긴 말은 지우지 않는다"
+
+    back = core.set_session_status(task.id, s.id, core.STOPPED)
+    assert back.status == core.RUNNING
+
+
+def test_살아있는_세션은_사람이_못_바꾼다():
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+
+    with pytest.raises(core.DuetError, match="살아 있는"):
+        core.set_session_status(task.id, s.id, core.DONE)
+
+
+def test_잘못된_세션_변경은_거부한다():
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+    core.finish(s, core.STOPPED, "끝")
+
+    with pytest.raises(core.DuetError):
+        core.set_session_status(task.id, s.id, core.RUNNING)
+    with pytest.raises(core.DuetError):
+        core.set_session_status(task.id, "s-없는것", core.DONE)
+
+
+def test_타스크를_닫으면_남은_세션이_중지로_적힌다():
+    task = core.create_task("전환")
+    a, b = core.register_session(), core.register_session()
+    core.join(a, task.id, "끝낸 것")
+    core.join(b, task.id, "안 끝낸 것")
+    core.finish(a, core.DONE, "끝")
+    _stale(b)  # 죽었는데 아직 안 걷힌 세션
+
+    after = core.close_task(task.id)
+    assert after.status == core.DONE
+    assert after.override == core.DONE, "닫는 것은 사람이 정하는 일이다"
+    stopped = [s for s in after.sessions if s.title == "안 끝낸 것"][0]
+    assert stopped.status == core.STOPPED and stopped.by_human is True
+
+
+def test_닫아도_살아있는_세션은_건드리지_않는다():
+    """남의 프로세스를 죽이지 않는다. 그래도 타스크는 사람이 정한 완료로 남는다."""
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id, "도는 세션")
+
+    after = core.close_task(task.id)
+    assert after.status == core.DONE
+    assert after.sessions[0].status == core.RUNNING, "그 파일의 주인은 그 프로세스다"
+
+
+def test_보관하면_보드에서_빠지고_되돌리면_돌아온다():
+    task = core.create_task("끝난 일")
+    core.set_status(task.id, core.DONE)
+
+    archived = core.archive_task(task.id)
+    assert archived.dir.parent.name == core.ARCHIVE_DIRNAME
+    assert core.list_tasks() == [], "보드에서 빠진다"
+    assert [t.id for t in core.list_archived()] == [task.id]
+    assert archived.title == "끝난 일", "파일은 그대로다"
+
+    back = core.unarchive_task(task.id)
+    assert back.dir.parent == core.home()
+    assert [t.id for t in core.list_tasks()] == [task.id]
+    assert core.list_archived() == []
+
+
+def test_보관은_지우는_것이_아니다():
+    task = core.create_task("끝난 일", "설명 줄")
+    s = core.register_session()
+    core.join(s, task.id, "세션 하나")
+    core.report(s, "한 줄 남김")
+    core.finish(s, core.DONE, "끝")
+
+    archived = core.archive_task(task.id)
+    assert (archived.dir / "task.md").is_file()
+    assert archived.sessions[0].progress[0]["msg"] == "한 줄 남김"
+
+
+def test_보관함에_없는_것은_못_꺼낸다():
+    with pytest.raises(core.DuetError):
+        core.unarchive_task(99)
+
+
+def test_살아있는_세션이_있으면_보관하지_않는다():
+    """폴더를 옮기면 그 프로세스가 기억하는 경로가 끊긴다."""
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+
+    with pytest.raises(core.DuetError, match="먼저 닫고"):
+        core.archive_task(task.id)
+
+
+def test_닫은_타스크는_확인_필요에서_빠진다():
+    """판단이 끝난 일이 계속 손을 요구하면 안 된다."""
+    task = core.create_task("전환")
+    s = core.register_session()
+    core.join(s, task.id)
+    core.finish(s, core.STOPPED, "여기까지")
+    assert core.get_task(task.id).warning, "닫기 전에는 경고가 뜬다"
+
+    assert core.close_task(task.id).warning == ""

@@ -30,7 +30,8 @@ Python 3.11+, uv, FastMCP, watchdog, FastAPI + SSE, 정적 HTML 한 장
 - [x] 1단계 프로토타입: core.py 하나에 파일 구조와 규칙, MCP 도구 5개 (stdio 실측 13건 통과)
 - [x] 2단계: `get_task`·`pause_session`·`update_task` (인수인계 실측). instructions 주입·중지 감지는 1단계에서 끝냄
 - [x] 3단계: 대시보드 — 집계 타일·필터·검색·카드 그리드·세션 로그 펼치기·인라인 편집·새 타스크 (폴링 2초, SSE는 아직)
-- [ ] 4단계: 타스크 상세·세션 타임라인·`app` 창
+- [x] 4단계 기본: 세션 상태 수동 변경·타스크 닫기·보관/되돌리기 (브라우저 실동작 확인)
+- [ ] 4단계 나머지: `app` 창(pywebview), watchdog + SSE로 폴링 걷어내기
 - [ ] 5단계: PyPI `duet-mcp`, `.mcpb`, 인스톨러
 
 단계를 끝내면 위 체크박스를 갱신한다.

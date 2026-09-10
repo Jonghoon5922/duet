@@ -169,6 +169,20 @@ check("사람이 정한 상태는 세션이 붙어도 안 바뀐다", core.get_t
 d.close()
 check("그 줄을 지우면 다시 센다", core.set_status(task_id, None).status == "진행중")
 
+# 사람이 손대는 자리: 중지 세션을 완료로 → 타스크가 스스로 닫힌다
+stopped = [s for s in core.get_task(task_id).sessions if s.status == "중지"]
+core.set_session_status(task_id, stopped[0].id, "완료")
+check("중지 세션을 완료로 바꾸면 세는 값이 달라진다",
+      core.get_task(task_id).counts["중지"] == len(stopped) - 1)
+
+closed = core.close_task(task_id)
+check("타스크 닫기 → 남은 중지가 정리되고 완료", closed.status == "완료" and closed.override == "완료")
+check("닫은 뒤에는 경고가 없다", closed.warning == "", closed.warning)
+
+core.archive_task(task_id)
+check("보관하면 보드에서 빠진다", core.list_tasks() == [] and len(core.list_archived()) == 1)
+check("되돌리면 돌아온다", core.unarchive_task(task_id).id == task_id and core.list_archived() == [])
+
 print()
 print("실패 있음" if FAILED else "전부 통과")
 sys.exit(1 if FAILED else 0)

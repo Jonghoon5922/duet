@@ -34,7 +34,8 @@ from pathlib import Path
 from typing import Any
 
 HOME_ENV = "DUET_HOME"
-IDLE_DIRNAME = "_미참여"  # 밑줄을 붙여 탐색기에서 타스크들 위에 고정되게 한다
+IDLE_DIRNAME = "_미참여"    # 밑줄을 붙여 탐색기에서 타스크들 위에 고정되게 한다
+ARCHIVE_DIRNAME = "_보관"  # 끝난 타스크를 치워 두는 곳. 지우는 것이 아니다
 
 HEARTBEAT_SEC = 30.0
 STALE_SEC = 90.0  # 이만큼 하트비트가 없으면 죽은 세션이다
@@ -84,6 +85,8 @@ class Session:
     started: str = ""
     heartbeat: str = ""
     summary: str = ""
+    #: 이 상태를 사람이 정했나. 세션이 스스로 보고한 것과 구분해 화면에 표시한다.
+    by_human: bool = False
     progress: list[dict[str, Any]] = field(default_factory=list)
     path: Path | None = field(default=None, compare=False, repr=False)
 
@@ -105,6 +108,7 @@ class Session:
             "title": self.title,
             "client": self.client,
             "status": self.shown_status,
+            "by_human": self.by_human,
             "alive": self.alive,
             "started": self.started,
             "heartbeat": self.heartbeat,
@@ -174,6 +178,12 @@ class Task:
 
     @property
     def warning(self) -> str:
+        """사람이 봐야 하는 것. **아직 닫히지 않은** 타스크에만 뜬다.
+
+        닫고 나서도 경고가 남으면 "확인 필요"가 영영 줄지 않는다 — 이미 판단한 일이다.
+        """
+        if self.status in (DONE, "취소"):
+            return ""
         c = self.counts
         if c[STOPPED] and not c[RUNNING]:
             return f"중지된 세션 {c[STOPPED]}개 — 이어서 할지 사람이 정한다"
@@ -229,7 +239,29 @@ def _write_task(task_dir: Path, title: str, description: str, override: str | No
 
 
 def task_dirs() -> list[Path]:
+    """보드에 뜨는 타스크 폴더. `_`로 시작하는 폴더(미참여·보관)는 이름에서 걸러진다."""
     return sorted(p for p in home().iterdir() if p.is_dir() and TASK_DIR.match(p.name))
+
+
+def archive_dir() -> Path:
+    path = home() / ARCHIVE_DIRNAME
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def archived_dirs() -> list[Path]:
+    return sorted(p for p in archive_dir().iterdir() if p.is_dir() and TASK_DIR.match(p.name))
+
+
+def list_archived() -> list[Task]:
+    """보관함. 여기서는 죽은 세션을 걷어내지 않는다 — 이미 끝난 일이다."""
+    out = []
+    for task_dir in archived_dirs():
+        try:
+            out.append(_read_task(task_dir))
+        except (OSError, AttributeError, IndexError):
+            continue
+    return sorted(out, key=lambda t: t.id, reverse=True)
 
 
 def find_task(task_id: str | int) -> Path:
@@ -377,6 +409,87 @@ def finish(session: Session, status: str, summary: str = "") -> Task | None:
     session.summary = summary.strip()
     session.save()
     return task_of(session)
+
+
+def set_session_status(task_id: str | int, session_id: str, status: str) -> Task:
+    """**끝난** 세션의 상태를 사람이 바꾼다 (중지 → 완료, 또는 그 반대).
+
+    살아 있는 세션은 건드리지 않는다. 그 파일의 주인은 그 프로세스이고, 사람이 끼어들면
+    "한 파일에 두 주인이 없다"가 깨진다. 도는 세션을 멈추는 것은 `pause_session`이 할 일이다.
+
+    중지된 세션을 `완료`로 바꾸면 자동 규칙이 다시 세서 타스크가 스스로 닫힌다 —
+    타스크 상태를 통째로 덮지 않고 닫는 길이 이것이다.
+    """
+    if status not in CLOSED:
+        raise DuetError("세션은 완료 또는 중지로만 바꾼다.")
+    task = get_task(task_id)
+    for session in task.sessions:
+        if session.id == session_id:
+            break
+    else:
+        raise DuetError(f"{task.id}에 {session_id} 세션이 없다.")
+
+    if session.alive:
+        raise DuetError("아직 살아 있는 세션이다. 그 창을 닫거나 pause_session을 부르게 하라.")
+
+    session.status = status
+    session.by_human = True
+    session.save()
+    return get_task(task_id)
+
+
+def archive_task(task_id: str | int) -> Task:
+    """타스크 폴더를 `_보관/`으로 옮긴다.
+
+    **지우지 않는다.** 끝난 일을 보드에서 치우는 것과 없애는 것은 다르고, 없애는 쪽은
+    되돌릴 수 없다. 폴더째 옮겨 두면 탐색기에서도 그대로 읽히고 언제든 되돌아온다.
+    """
+    task_dir = find_task(task_id)
+    if any(s.alive for s in read_sessions(task_dir)):
+        # 폴더를 옮기면 그 세션 프로세스가 기억하고 있는 경로가 끊긴다. 닫고 나서 치운다.
+        raise DuetError("살아 있는 세션이 있다. 먼저 닫고 나서 보관한다.")
+    target = archive_dir() / task_dir.name
+    if target.exists():
+        raise DuetError(f"보관함에 같은 이름이 이미 있다: {task_dir.name}")
+    task_dir.rename(target)
+    return _read_task(target)
+
+
+def unarchive_task(task_id: str | int) -> Task:
+    """보관함에서 도로 꺼낸다."""
+    wanted = str(task_id).strip().upper().lstrip("T")
+    if not wanted.isdigit():
+        raise DuetError(f"타스크 id가 아니다: {task_id}")
+    wanted = f"T{int(wanted):03d}"
+
+    for p in archived_dirs():
+        if TASK_DIR.match(p.name).group(1) != wanted:
+            continue
+        target = home() / p.name
+        if target.exists():
+            raise DuetError(f"보드에 같은 이름이 이미 있다: {p.name}")
+        p.rename(target)
+        return _read_task(target)
+    raise DuetError(f"보관함에 {wanted}가 없다.")
+
+
+def close_task(task_id: str | int, reason: str = "사람이 타스크를 닫았다") -> Task:
+    """이 타스크를 닫는다 (SPEC 7절).
+
+    끝나지 않은 채 죽어 있는 세션을 `중지`로 적고, 타스크를 사람이 정한 `완료`로 둔다.
+    **살아 있는 세션은 건드리지 않는다** — 그 파일의 주인은 그 프로세스이고, 우리는 남의
+    프로세스를 죽이지 않는다. 그 창을 닫으면 스스로 `중지`로 적힌다. 그동안에도 타스크는
+    사람이 정한 `완료`로 남는다.
+    """
+    task = get_task(task_id)
+    for session in task.sessions:
+        if session.status in CLOSED or session.alive:
+            continue
+        session.status = STOPPED
+        session.summary = session.summary or reason
+        session.by_human = True
+        session.save()
+    return set_status(task_id, DONE)
 
 
 def reap() -> list[str]:
