@@ -185,6 +185,8 @@ dialog h2{margin:0 0 14px;font-size:16px}
 .tbody .sessions{background:var(--panel);border:1px solid var(--line-2);border-radius:8px;margin-bottom:8px}
 .tbody .foot{border-top:0;padding-top:2px}
 .empty{grid-column:auto}
+.lock{border:0;background:none;padding:0 2px;font-size:12px;cursor:pointer;line-height:1}
+.lock:hover{filter:brightness(1.2)}
 </style>
 </head>
 <body>
@@ -214,8 +216,8 @@ dialog h2{margin:0 0 14px;font-size:16px}
 
   <div class="grid" id="grid"></div>
   <p class="hint">
-    제목과 설명은 클릭해서 고친다. 상태를 <b>사람이 정함</b>으로 두면 세션을 세는 자동 규칙보다 앞선다 —
-    <code>task.md</code>의 <code>상태:</code> 줄이 그것이고, <b>자동</b>으로 되돌리면 그 줄이 지워진다.<br>
+    타스크 줄을 누르면 펼쳐진다. 제목과 설명은 클릭해서 고친다. 상태는 세션에서 저절로 정해지고,
+    드롭다운에서 고르면 그것이 상태가 된다 (🔒). 🔒를 누르면 다시 세션에서 센다.<br>
     세션 줄은 사람이 만들지 않는다. Claude가 <code>join_task</code>로 붙고 <code>report_progress</code>로 로그를 쌓는다. 세션을 눌러 펼치면 그 로그가 나온다.
   </p>
 </div>
@@ -270,23 +272,46 @@ function toast(message) {
 /* ---------- 카드 ---------- */
 
 function statusSelect(task) {
-  const sel = el("select", { className: `sel s-${task.status}`, title: "사람이 정한 상태가 자동 규칙을 덮는다" });
-  sel.append(el("option", { value: "", textContent: "자동" }));
-  for (const s of STATUSES) {
-    sel.append(el("option", { value: s, textContent: `사람이 정함: ${s}`, selected: task.override === s }));
+  // PMS답게 지금 상태만 보여준다. 고르면 그것이 상태가 된다 (= task.md의 `상태:` 줄).
+  // "계산값이냐 사람이 정한 값이냐"는 내부 사정이라 화면에 올리지 않는다 — 🔒 하나로 족하다.
+  const sel = el("select", { className: `sel s-${task.status}`, title: "상태" });
+  for (const st of STATUSES) {
+    sel.append(el("option", { value: st, textContent: st, selected: task.status === st }));
   }
   sel.onchange = async () => {
     try {
       await api(`/api/tasks/${task.id}/status`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: sel.value || null }),
+        body: JSON.stringify({ status: sel.value }),
       });
-      toast(sel.value ? `${task.id} → 사람이 정함: ${sel.value}` : `${task.id} → 다시 자동 판정`);
+      toast(`${task.id} → ${sel.value}`);
       refresh(true);
     } catch (e) { toast(e.message); }
   };
   return sel;
+}
+
+// 사람이 정해 둔 상태에 붙는 자물쇠. 누르면 그 줄을 지워 다시 세션에서 센다.
+function unlockButton(task) {
+  if (!task.override) return null;
+  const button = el("button", {
+    className: "lock", type: "button", textContent: "🔒",
+    title: "사람이 정한 상태다. 누르면 다시 세션에서 센다",
+  });
+  button.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      await api(`/api/tasks/${task.id}/status`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: null }),
+      });
+      toast(`${task.id} → 다시 세션에서 센다`);
+      refresh(true);
+    } catch (err) { toast(err.message); }
+  };
+  return button;
 }
 
 // 제목·설명 인라인 편집. 포커스를 잃을 때만 보낸다.
@@ -415,7 +440,8 @@ function taskRow(task) {
       title,
       task.warning ? el("span", { className: "warn-dot", title: task.warning, textContent: "⚠" }) : null,
       el("span", { className: "cnt mono", title: "세션 완료/전체", textContent: `${done}/${total}` }),
-      sel),
+      sel,
+      unlockButton(task)),
     el("div", { className: "tbody" },
       el("div", { className: "desc" }, editable(task, "description", task.description, "")),
       el("div", { className: "meta" },
