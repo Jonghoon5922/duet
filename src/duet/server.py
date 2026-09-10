@@ -11,6 +11,7 @@ from __future__ import annotations
 import atexit
 import os
 import threading
+from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
@@ -40,9 +41,21 @@ def build_instructions() -> str:
         "",
     ]
     if open_tasks:
-        lines.append("열린 타스크:")
-        for t in open_tasks[:12]:
-            lines.append(f"- [{t.id}] {t.title} ({t.status}, 세션 {t.counts[core.RUNNING]}개 진행중)")
+        here = core.project_name(str(Path.cwd()))
+        mine = [t for t in open_tasks if t.project == here] if here else []
+        others = [t for t in open_tasks if t not in mine]
+
+        def line(t):
+            return f"- [{t.id}] {t.title} ({t.status}, 세션 {t.counts[core.RUNNING]}개 진행중)"
+
+        if mine:
+            lines.append(f"이 폴더({here})의 열린 타스크:")
+            lines += [line(t) for t in mine[:12]]
+            if others:
+                lines.append("")
+        if others:
+            lines.append("다른 프로젝트의 열린 타스크:" if mine else "열린 타스크:")
+            lines += [f"{line(t)}{f' — {t.project}' if t.project else ''}" for t in others[:12]]
     else:
         lines.append("지금 열린 타스크가 없다. 새 일이면 create_task로 만든다.")
 
@@ -90,13 +103,16 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         name="create_task",
         description=(
             "새 타스크를 만든다(`대기`). 참여까지 하지는 않으므로, 이 세션이 그 일을 "
-            "할 것이면 이어서 join_task를 호출하라."
+            "할 것이면 이어서 join_task를 호출하라. project는 보통 비워 둔다 — "
+            "이 세션이 join하면 세션이 뜬 폴더에서 저절로 정해진다."
         ),
     )
-    def create_task_tool(ctx: Context, title: str, description: str = "") -> dict[str, Any]:
+    def create_task_tool(
+        ctx: Context, title: str, description: str = "", project: str = ""
+    ) -> dict[str, Any]:
         touch(ctx)
         try:
-            task = core.create_task(title, description)
+            task = core.create_task(title, description, project)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
         return {"task": task.to_dict(), "next": "이 세션이 이 일을 한다면 join_task를 호출하라."}
@@ -157,17 +173,19 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         title: str | None = None,
         description: str | None = None,
         status: str | None = None,
+        project: str | None = None,
     ) -> dict[str, Any]:
         touch(ctx)
         try:
-            task = core.update_task(task_id, title, description)
+            task = core.update_task(task_id, title, description, project)
             if status is not None:
                 task = core.set_status(task_id, None if status == "자동" else status)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
 
         changed = [name for name, value in
-                   (("제목", title), ("설명", description), ("상태", status)) if value is not None]
+                   (("제목", title), ("설명", description), ("상태", status),
+                    ("프로젝트", project)) if value is not None]
         return {
             "task": task.to_dict(),
             "changed": changed or ["없음"],
@@ -254,7 +272,7 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
 
 def serve() -> None:
     """이 함수가 도는 동안이 곧 세션 하나의 수명이다."""
-    session = core.register_session(client=_guess_client())
+    session = core.register_session(client=_guess_client(), cwd=str(Path.cwd()))
     lock = threading.Lock()
     stop = threading.Event()
     closed = threading.Event()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pathlib
 from datetime import datetime, timedelta
 
 import pytest
@@ -292,3 +293,52 @@ def test_닫은_타스크는_확인_필요에서_빠진다():
     assert core.get_task(task.id).warning, "닫기 전에는 경고가 뜬다"
 
     assert core.close_task(task.id).warning == ""
+
+
+def test_프로젝트는_세션이_뜬_폴더에서_저절로_정해진다():
+    task = core.create_task("전환")
+    assert task.project == "", "세션이 없으면 모른다"
+
+    s = core.register_session("Claude Code", cwd=r"C:\project\nefss")
+    core.join(s, task.id)
+    assert core.get_task(task.id).project == "nefss"
+    assert core.get_task(task.id).project_override == "", "파일에 적지 않았다"
+
+
+def test_참여할_때_task_md를_건드리지_않는다():
+    """프로젝트도 계산이다. 세션이 붙는다고 파일을 쓰면 여럿이 부딪힌다."""
+    task = core.create_task("전환")
+    before = (task.dir / "task.md").read_text(encoding="utf-8")
+
+    s = core.register_session("Claude Code", cwd=r"C:\project\nefss")
+    core.join(s, task.id)
+    assert (task.dir / "task.md").read_text(encoding="utf-8") == before
+
+
+def test_사람이_적은_프로젝트가_이긴다():
+    task = core.create_task("전환", project="nefss")
+    s = core.register_session("Claude Code", cwd=r"C:\project\다른것")
+    core.join(s, task.id)
+
+    assert core.get_task(task.id).project == "nefss"
+    assert "프로젝트: nefss" in (task.dir / "task.md").read_text(encoding="utf-8")
+
+    # 빈 문자열을 주면 그 줄이 지워지고 다시 센다
+    after = core.update_task(task.id, project="")
+    assert after.project == "다른것" and after.project_override == ""
+
+
+def test_프로젝트로_볼_수_없는_폴더는_모른다고_둔다():
+    assert core.project_name(r"C:\project\duet") == "duet"
+    assert core.project_name("") == ""
+    assert core.project_name(r"C:\Windows\System32") == ""
+    assert core.project_name(str(pathlib.Path.home() / ".cache")) == ""
+
+
+def test_제목을_고쳐도_프로젝트_줄은_남는다():
+    task = core.create_task("옛 제목", project="nefss")
+    after = core.update_task(task.id, title="새 제목")
+    assert after.project_override == "nefss"
+
+    core.set_status(task.id, core.DONE)
+    assert core.get_task(task.id).project_override == "nefss"

@@ -18,8 +18,11 @@
 2. **사람이 정한 것이 이긴다.** `task.md`에 `상태: 완료` 한 줄이 있으면 그게 상태다.
    그 줄을 지우면 다시 센다.
 
-한 파일에 두 주인이 없다. 세션 파일은 그 세션의 프로세스만 쓰고, `task.md`는
-사람만 쓴다. 그래서 락이 없다.
+**한 파일에 두 주인이 없다.** 세션 파일은 그 세션의 프로세스만 쓴다.
+`task.md`는 **편집만** 쓴다 — 사람이 화면·탐색기에서, Claude가 `update_task`로.
+둘 다 누가 시켜서 한 번 일어나는 일이라 부딪히지 않는다. 자동으로 도는 것들
+(하트비트, 참여, 진행 보고, 상태·프로젝트 계산)은 `task.md`를 절대 건드리지 않는다.
+그래서 락이 없다.
 """
 
 from __future__ import annotations
@@ -46,6 +49,11 @@ CLOSED = (DONE, STOPPED)
 
 TASK_DIR = re.compile(r"^(T\d{3,})(?:-.*)?$")
 STATUS_LINE = re.compile(r"^상태:\s*(\S+)\s*$", re.MULTILINE)
+PROJECT_LINE = re.compile(r"^프로젝트:\s*(.+?)\s*$", re.MULTILINE)
+META_LINE = re.compile(r"^(?:상태|프로젝트):\s*.*$")
+
+#: 프로젝트 이름으로 삼지 않을 폴더. 여기서 세션이 떴다면 프로젝트를 안 것이 아니다.
+NOT_PROJECT = frozenset({"", "/", "\\", "system32", "windows", "desktop", "바탕 화면", "temp", "tmp"})
 BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
@@ -82,6 +90,8 @@ class Session:
     title: str = ""
     client: str = "알 수 없음"
     status: str = RUNNING  # 참여 여부는 파일이 어느 폴더에 있느냐로 안다
+    #: 이 세션이 뜬 폴더. 어느 프로젝트에서 일하는지가 여기서 나온다.
+    cwd: str = ""
     started: str = ""
     heartbeat: str = ""
     summary: str = ""
@@ -107,6 +117,7 @@ class Session:
             "id": self.id,
             "title": self.title,
             "client": self.client,
+            "cwd": self.cwd,
             "status": self.shown_status,
             "by_human": self.by_human,
             "alive": self.alive,
@@ -151,7 +162,25 @@ class Task:
     description: str
     override: str | None
     dir: Path
+    #: `프로젝트:` 줄. 사람이 적었을 때만 있고, 계산값을 덮는다.
+    project_override: str = ""
     sessions: list[Session] = field(default_factory=list)
+
+    @property
+    def project(self) -> str:
+        """어느 일에 속하나. **저장하지 않고 센다** — 상태와 같은 방식이다.
+
+        붙은 세션이 뜬 폴더가 곧 프로젝트다. 사람이 분류하지 않아도 저절로 묶이고,
+        `프로젝트:` 줄을 적어 두면 그것이 이긴다. 세션도 없고 적힌 줄도 없으면
+        빈 문자열 — 모르면 모른다고 둔다.
+        """
+        if self.project_override:
+            return self.project_override
+        for session in self.sessions:  # 먼저 붙은 세션이 정한다
+            name = project_name(session.cwd)
+            if name:
+                return name
+        return ""
 
     @property
     def counts(self) -> dict[str, int]:
@@ -197,6 +226,8 @@ class Task:
             "status": self.status,
             "counts": self.counts,
             "override": self.override,
+            "project": self.project,
+            "project_override": self.project_override,
             "warning": self.warning,
             "last_activity": self.last_activity,
         }
@@ -211,27 +242,45 @@ class Task:
 
 
 def _read_task(task_dir: Path) -> Task:
-    """`task.md`: 첫 줄이 `# 제목`, `상태:` 줄이 있으면 사람이 정한 것, 나머지는 설명."""
+    """`task.md`를 읽는다.
+
+    ```markdown
+    # pc101pm 전환
+    프로젝트: nefss        ← 어느 일에 속하나 (비어 있으면 세션이 붙을 때 저절로 채워진다)
+    상태: 완료             ← 사람이 정했을 때만. 지우면 다시 센다
+
+    설명 본문
+    ```
+    """
     text = (task_dir / "task.md").read_text(encoding="utf-8")
+
     override = None
     match = STATUS_LINE.search(text)
     if match and match.group(1) in TASK_STATUSES:
         override = match.group(1)
 
-    lines = [ln for ln in text.splitlines() if not STATUS_LINE.match(ln)]
+    found = PROJECT_LINE.search(text)
+    project = found.group(1) if found else ""
+
+    lines = [ln for ln in text.splitlines() if not META_LINE.match(ln)]
     title = lines[0].lstrip("# ").strip() if lines else task_dir.name
     return Task(
         id=TASK_DIR.match(task_dir.name).group(1),
         title=title,
         description="\n".join(lines[1:]).strip(),
         override=override,
+        project_override=project,
         dir=task_dir,
         sessions=read_sessions(task_dir),
     )
 
 
-def _write_task(task_dir: Path, title: str, description: str, override: str | None) -> None:
+def _write_task(
+    task_dir: Path, title: str, description: str, override: str | None, project: str = ""
+) -> None:
     out = [f"# {title}"]
+    if project:
+        out.append(f"프로젝트: {project}")
     if override:
         out.append(f"상태: {override}")
     out += ["", description.strip(), ""]
@@ -276,7 +325,7 @@ def find_task(task_id: str | int) -> Path:
     raise DuetError(f"{wanted} 타스크가 없다.")
 
 
-def create_task(title: str, description: str = "") -> Task:
+def create_task(title: str, description: str = "", project: str = "") -> Task:
     title = title.strip()
     if not title:
         raise DuetError("타스크 제목이 비어 있다.")
@@ -292,7 +341,7 @@ def create_task(title: str, description: str = "") -> Task:
         except FileExistsError:
             number += 1
 
-    _write_task(task_dir, title, description, None)
+    _write_task(task_dir, title, description, None, project.strip())
     return _read_task(task_dir)
 
 
@@ -315,7 +364,10 @@ def list_tasks(status: str | None = None) -> list[Task]:
 
 
 def update_task(
-    task_id: str | int, title: str | None = None, description: str | None = None
+    task_id: str | int,
+    title: str | None = None,
+    description: str | None = None,
+    project: str | None = None,
 ) -> Task:
     """제목·설명을 고친다. **폴더 이름은 그대로 둔다** — 판별자는 앞의 id다.
 
@@ -327,8 +379,10 @@ def update_task(
     if not new_title:
         raise DuetError("타스크 제목이 비어 있다.")
     new_description = task.description if description is None else description.strip()
+    # 빈 문자열을 주면 그 줄을 지워 다시 세게 한다. None은 '안 건드림'이다.
+    new_project = task.project_override if project is None else project.strip()
 
-    _write_task(task.dir, new_title, new_description, task.override)
+    _write_task(task.dir, new_title, new_description, task.override, new_project)
     return get_task(task_id)
 
 
@@ -337,23 +391,44 @@ def set_status(task_id: str | int, status: str | None) -> Task:
     if status is not None and status not in TASK_STATUSES:
         raise DuetError(f"모르는 상태다: {status} (가능: {', '.join(TASK_STATUSES)})")
     task = get_task(task_id)
-    _write_task(task.dir, task.title, task.description, status)
+    _write_task(task.dir, task.title, task.description, status, task.project_override)
     return get_task(task_id)
 
 
 # --- 세션 -----------------------------------------------------------------
 
 
-def register_session(client: str = "알 수 없음") -> Session:
+def project_name(cwd: str) -> str:
+    """세션이 뜬 폴더에서 프로젝트 이름을 짚는다.
+
+    Claude Code는 프로젝트 폴더에서 뜨므로 그 폴더 이름이 곧 프로젝트다. 하지만
+    Claude Desktop처럼 엉뚱한 데서 뜨는 클라이언트도 있어서, 프로젝트로 볼 수 없는
+    이름이면 빈 문자열을 준다 — **모르면 모른다고 두는 편이 틀린 이름보다 낫다.**
+    """
+    if not cwd:
+        return ""
+    name = Path(cwd).name.strip()
+    if name.lower() in NOT_PROJECT or name.startswith("."):
+        return ""
+    return name
+
+
+def register_session(client: str = "알 수 없음", cwd: str = "") -> Session:
     """서버 프로세스가 뜰 때 자기 파일을 `_미참여/`에 만든다."""
-    session = Session(id="s-" + uuid.uuid4().hex[:8], client=client, started=now(), heartbeat=now())
+    session = Session(
+        id="s-" + uuid.uuid4().hex[:8], client=client, cwd=cwd, started=now(), heartbeat=now()
+    )
     session.path = home() / IDLE_DIRNAME / f"{session.id}.json"
     session.save()
     return session
 
 
 def join(session: Session, task_id: str | int, title: str = "") -> Task:
-    """세션 파일을 타스크 폴더로 옮긴다. `task.md`는 건드리지 않는다."""
+    """세션 파일을 타스크 폴더로 옮긴다.
+
+    `task.md`는 건드리지 않는다. 이 세션이 뜬 폴더가 파일에 남으므로, 타스크가 어느
+    프로젝트 것인지는 읽는 쪽이 세션에서 계산한다 — 상태와 같은 방식이다.
+    """
     if session.status in CLOSED:
         raise DuetError("이미 끝난 세션이다. 새 세션에서 참여하라.")
     task_dir = find_task(task_id)

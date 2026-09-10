@@ -120,3 +120,24 @@ def test_살아있는_세션_변경은_거부한다(client):
     res = client.post(f"/api/tasks/{task.id}/sessions/{s.id}/status", json={"status": "완료"})
     assert res.status_code == 400
     assert "살아 있는" in res.json()["detail"]
+
+
+def test_화면에서_프로젝트를_고친다(client):
+    task = core.create_task("전환")
+    s = core.register_session("Claude Code", cwd=r"C:\project\nefss")
+    core.join(s, task.id)
+
+    body = client.get("/api/tasks").json()
+    assert body["tasks"][0]["project"] == "nefss", "세션이 뜬 폴더에서 저절로"
+    assert body["tasks"][0]["project_override"] == ""
+
+    edited = client.patch(f"/api/tasks/{task.id}", json={"project": "일지"}).json()
+    assert edited["project"] == "일지" and edited["project_override"] == "일지"
+
+    back = client.patch(f"/api/tasks/{task.id}", json={"project": ""}).json()
+    assert back["project"] == "nefss", "지우면 다시 센다"
+
+
+def test_새_타스크에_프로젝트를_줄_수_있다(client):
+    body = client.post("/api/tasks", json={"title": "전환", "project": "nefss"}).json()
+    assert body["project"] == "nefss"

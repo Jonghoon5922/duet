@@ -33,12 +33,15 @@ class StatusIn(BaseModel):
 class TaskIn(BaseModel):
     title: str
     description: str = ""
+    project: str = ""
 
 
 class EditIn(BaseModel):
     #: 준 것만 바뀐다. None은 "안 건드림"이다.
     title: str | None = None
     description: str | None = None
+    #: 빈 문자열이면 `프로젝트:` 줄을 지워 다시 세게 한다.
+    project: str | None = None
 
 
 def create_app() -> FastAPI:
@@ -59,12 +62,14 @@ def create_app() -> FastAPI:
             "statuses": list(core.TASK_STATUSES),
             "home": str(core.home()),
             "archived": len(core.archived_dirs()),
+            # 대시보드를 띄운 폴더. 지금 어느 프로젝트를 보고 있는지의 기준이다.
+            "here": core.project_name(str(Path.cwd())),
         }
 
     @app.post("/api/tasks", status_code=201)
     def new_task(body: TaskIn) -> dict[str, Any]:
         try:
-            return core.create_task(body.title, body.description).to_detail()
+            return core.create_task(body.title, body.description, body.project).to_detail()
         except core.DuetError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except OSError as e:
@@ -74,7 +79,7 @@ def create_app() -> FastAPI:
     def edit_task(task_id: str, body: EditIn) -> dict[str, Any]:
         """제목·설명 인라인 편집. 사람이 정한 상태는 건드리지 않는다."""
         try:
-            return core.update_task(task_id, body.title, body.description).to_detail()
+            return core.update_task(task_id, body.title, body.description, body.project).to_detail()
         except core.DuetError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except OSError as e:
