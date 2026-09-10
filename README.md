@@ -71,7 +71,7 @@ MCP는 클라이언트가 화면에 무슨 이름을 띄우는지 알려주지 �
 ## 대시보드
 
 ```bash
-uv run --no-sync --directory C:/project/duet duet ui   # http://127.0.0.1:8737
+duet ui        # http://127.0.0.1:8737
 ```
 
 위에 상태별 집계 타일(누르면 필터), 아래에 카드 그리드. 카드마다 상태 띠·진행 막대·세션 줄이 있고,
@@ -135,17 +135,26 @@ uv run --no-sync --directory C:/project/duet duet ui   # http://127.0.0.1:8737
 
 ## 쓰기
 
-```json
-{
-  "mcpServers": {
-    "duet": {
-      "command": "uv",
-      "args": ["run", "--no-sync", "duet", "serve"],
-      "cwd": "C:/project/duet"
-    }
-  }
-}
+프로젝트 `.venv`를 거치지 않는다. 셸마다 uv 데이터 폴더가 다를 수 있어 `.venv`가 한쪽에서는
+멀쩡하고 다른 쪽에서는 "없는 인터프리터"가 되는 일이 실제로 있었다. `uv run`이 창이 열릴 때마다
+환경을 맞추려 들면서, 떠 있는 duet 서버가 잡고 있는 `duet.exe`를 다시 쓰려다 막히기도 했다.
+그래서 **독립 환경에 실행 파일로** 깐다. 소스는 editable이라 코드를 고치면 바로 반영된다.
+
+```bash
+uv tool install --editable --python 3.12 C:/project/duet
+uv tool update-shell          # ~/.local/bin 을 PATH에 (한 번만)
 ```
+
+그다음 사용자 범위로 한 번 등록하면 **모든 프로젝트 창**에서 붙는다. 창마다 할 것은 없다.
+
+```bash
+claude mcp add -s user duet -- duet serve
+```
+
+(`duet`가 PATH에 없으면 `C:\Users\<이름>\.local\bin\duet.exe` 전체 경로로.)
+
+의존성을 바꿨을 때만 `uv tool install --editable --reinstall C:/project/duet`.
+개발 중 테스트는 `uv sync --group dev` 뒤 `uv run --no-sync pytest`.
 
 MCP 도구: `list_tasks` · `create_task` · `join_task` · `get_task` · `update_task` · `report_progress` · `complete_session` · `pause_session`
 
