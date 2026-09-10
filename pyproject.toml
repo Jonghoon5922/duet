@@ -46,7 +46,7 @@ duet = "duet.cli:app"
 duet-mcp = "duet.cli:app"
 
 [dependency-groups]
-dev = ["pytest>=8.3", "httpx>=0.27"]  # httpx는 fastapi TestClient가 쓴다
+dev = ["pytest>=8.3", "httpx>=0.27", "pyinstaller>=6.10"]  # httpx는 TestClient, pyinstaller는 installer/
 
 # 버전은 src/duet/__init__.py 한 곳에만 있다. 여기서 읽으므로 어긋날 수 없다.
 [tool.hatch.version]

@@ -136,3 +136,67 @@ def ui(
 
     console.print(f"[dim]http://{DEFAULT_HOST}:{port}  ({core.home()})[/dim]")
     serve_ui(port=port, open_browser=not no_open)
+
+
+# --- MCP 클라이언트 연결 (인스톨러가 부른다) ---------------------------------
+
+
+def _serve_command() -> tuple[str, list[str]]:
+    """클라이언트 설정에 적을 실행 명령.
+
+    묶인 실행 파일이면 그 자신(`duet.exe serve`). 개발 중이면 uv tool로 깐 것을 찾고,
+    그것도 없으면 등록할 수 없다 — `.venv` 경로를 적어 두면 셸에 따라 깨진다.
+    """
+    if getattr(sys, "frozen", False):
+        return sys.executable, ["serve"]
+    import shutil
+
+    found = shutil.which("duet")
+    if found:
+        return found, ["serve"]
+    raise typer.BadParameter("등록할 실행 파일을 못 찾았다. 설치하거나 --command 로 경로를 줘라.")
+
+
+@app.command("mcp-register")
+def mcp_register(
+    client: str = typer.Option("claude-code", "--client", "-c", help="claude-code / claude-desktop / cursor / vscode / windsurf"),
+    command: Optional[str] = typer.Option(None, "--command", help="적을 실행 파일 경로 (기본: 이 실행 파일)"),
+) -> None:
+    """이 앱에 Duet을 연결한다. 남의 설정은 건드리지 않고, 고치기 전에 백업한다."""
+    from . import mcp_clients
+
+    try:
+        exe, args = (command, ["serve"]) if command else _serve_command()
+        console.print(mcp_clients.register(exe, client, args))
+        console.print(f"[dim]{mcp_clients.get_client(client).after}[/dim]")
+    except (mcp_clients.ConfigError, typer.BadParameter) as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("mcp-unregister")
+def mcp_unregister(
+    client: str = typer.Option("claude-code", "--client", "-c"),
+) -> None:
+    """연결을 지운다. 우리 항목만 지우고 나머지는 그대로 둔다."""
+    from . import mcp_clients
+
+    try:
+        console.print(mcp_clients.unregister(client))
+    except mcp_clients.ConfigError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("mcp-list")
+def mcp_list() -> None:
+    """어느 앱에 붙어 있는지 훑는다."""
+    from . import mcp_clients
+
+    table = Table(box=None, pad_edge=False)
+    for column in ("앱", "연결", "실행 명령", "설정 파일"):
+        table.add_column(column)
+    for row in mcp_clients.survey():
+        state = "[red]설정 깨짐[/red]" if row["broken"] else ("[green]●[/green]" if row["registered"] else "[dim]-[/dim]")
+        table.add_row(row["label"], state, row["command"] or "", f"[dim]{row['path']}[/dim]")
+    console.print(table)
