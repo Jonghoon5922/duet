@@ -65,15 +65,34 @@ def build_instructions() -> str:
         "확인하고 join_task를 호출하라. 새 일이면 create_task 후 join_task.",
         "작업 중간에 report_progress로 한 줄씩 남기고, 끝나면 complete_session을 호출하라.",
         "타스크는 끝을 판정할 수 있는 한 덩어리다. 세션 하나로 끝날 잔일이면 만들지 말고 그냥 해라.",
-        "세션 하나는 타스크 하나다. complete_session을 부르고 나면 이 창은 끝이다 — "
-        "다른 일을 시키면 새 창에서 하라고 말하라.",
+        "세션 하나는 타스크 하나다. 끝내고 다른 일을 시키면 그냥 join_task를 불러라 — "
+        "새 세션으로 이어진다. 한 창이 타스크를 순서대로 여러 개 해도 된다.",
         "프로젝트는 만드는 것이 아니다 — 세션이 뜬 폴더가 곧 프로젝트다.",
         "사용자가 타스크를 언급하지 않으면 묻지 말고 작업을 먼저 하되, 첫 보고 시점에 한 번만 확인한다.",
     ]
     return "\n".join(lines)
 
 
-def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
+class Current:
+    """이 프로세스가 지금 붙어 있는 세션.
+
+    한 창이 타스크를 순서대로 여러 개 할 수 있다. 앞 타스크를 끝내고 다음에 붙으면
+    **새 세션 파일**로 갈아탄다 — 앞 파일은 닫힌 채로 남고, 하트비트와 종료 훅은 지금
+    것에만 간다. 같은 창이라는 사실은 `client_session`(대화 id)이 묶어 준다.
+    """
+
+    def __init__(self, session: core.Session) -> None:
+        self.session = session
+
+    def renew(self) -> core.Session:
+        prev = self.session
+        self.session = core.register_session(
+            client=prev.client, cwd=prev.cwd, client_session=prev.client_session
+        )
+        return self.session
+
+
+def create_server(cur: Current, lock: threading.Lock) -> MCPServer:
     server = MCPServer(
         name="duet", title="Duet", version=__version__, instructions=build_instructions()
     )
@@ -86,8 +105,8 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
             label = label_client(info.name if info else None)
             with lock:
                 if label != "알 수 없음":
-                    session.client = label
-                core.heartbeat(session)
+                    cur.session.client = label
+                core.heartbeat(cur.session)
         except Exception:
             pass
 
@@ -97,7 +116,7 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
     )
     def list_tasks_tool(ctx: Context, status: str | None = None) -> dict[str, Any]:
         touch(ctx)
-        joined = core.task_of(session)
+        joined = core.task_of(cur.session)
         return {
             "joined_task": joined.id if joined else None,
             "tasks": [t.to_dict() for t in core.list_tasks(status)],
@@ -151,15 +170,20 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
     )
     def join_task_tool(ctx: Context, task_id: str, session_title: str = "") -> dict[str, Any]:
         touch(ctx)
+        renewed = False
         try:
             with lock:
-                task = core.join(session, task_id, session_title)
+                if cur.session.status in core.CLOSED:
+                    # 앞 타스크를 끝낸 창이 다음 타스크를 잡는다. 새 세션으로 이어진다.
+                    cur.renew()
+                    renewed = True
+                task = core.join(cur.session, task_id, session_title)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
-        return {
-            "task": task.to_dict(),
-            "note": "작업 중간에 report_progress, 끝나면 complete_session을 호출하라.",
-        }
+        note = "작업 중간에 report_progress, 끝나면 complete_session을 호출하라."
+        if renewed:
+            note = f"앞 세션은 닫힌 채 두고 새 세션 {cur.session.id}로 이어진다. " + note
+        return {"task": task.to_dict(), "session_id": cur.session.id, "note": note}
 
     @server.tool(
         name="get_task",
@@ -177,10 +201,10 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
             return {"error": str(e)}
 
         detail = task.to_detail()
-        mine = core.task_of(session)
+        mine = core.task_of(cur.session)
         if mine and mine.id == task.id:
             # 자기 것을 빼주면 "남이 뭘 했나"만 남는다. 이어받을 때 읽는 자리다.
-            detail["내_세션"] = session.id
+            detail["내_세션"] = cur.session.id
         return detail
 
     @server.tool(
@@ -229,7 +253,7 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         touch(ctx)
         try:
             with lock:
-                task = core.finish(session, core.STOPPED, reason)
+                task = core.finish(cur.session, core.STOPPED, reason)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
         if task is None:
@@ -256,10 +280,10 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         touch(ctx)
         try:
             with lock:
-                entry = core.report(session, message, percent)
+                entry = core.report(cur.session, message, percent)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
-        task = core.task_of(session)
+        task = core.task_of(cur.session)
         result = {"t": entry["t"], "task_id": task.id if task else None}
         if task is None:
             result["note"] = (
@@ -278,7 +302,7 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         touch(ctx)
         try:
             with lock:
-                task = core.finish(session, core.DONE, summary)
+                task = core.finish(cur.session, core.DONE, summary)
         except (core.DuetError, OSError) as e:
             return {"error": str(e)}
         if task is None:
@@ -297,12 +321,12 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
 
 def serve() -> None:
     """이 함수가 도는 동안이 곧 세션 하나의 수명이다."""
-    session = core.register_session(
+    cur = Current(core.register_session(
         client=_guess_client(),
         cwd=str(Path.cwd()),
         # Claude Code가 이 대화에 붙인 id. 대화 기록 파일 이름이 이것이다.
         client_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""),
-    )
+    ))
     lock = threading.Lock()
     stop = threading.Event()
     closed = threading.Event()
@@ -311,7 +335,7 @@ def serve() -> None:
         while not stop.wait(core.HEARTBEAT_SEC):
             try:
                 with lock:
-                    core.heartbeat(session)
+                    core.heartbeat(cur.session)
             except OSError:
                 continue  # 잠깐 못 썼을 뿐이다. 다음 박자에 다시 친다
 
@@ -323,14 +347,14 @@ def serve() -> None:
         stop.set()
         try:
             with lock:
-                core.finish(session, core.STOPPED, "세션 창이 닫힘 (보고 없이 종료)")
+                core.finish(cur.session, core.STOPPED, "세션 창이 닫힘 (보고 없이 종료)")
         except Exception:
             pass  # 종료 경로다. 여기서 예외를 올리면 보이는 건 스택뿐이다
 
     threading.Thread(target=beat, name="duet-heartbeat", daemon=True).start()
     atexit.register(close)
     try:
-        create_server(session, lock).run("stdio")
+        create_server(cur, lock).run("stdio")
     finally:
         close()
 

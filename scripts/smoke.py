@@ -126,6 +126,19 @@ check("세션이 붙고 보고해도 task.md는 그대로다 (충돌 없음)",
 done = b.tool("complete_session", {"summary": "Bean 끝"})
 check("B 완료 → 타스크 자동 완료", done["task"]["status"] == "완료", done.get("note", ""))
 
+# 한 창이 타스크를 순서대로: A는 T001을 끝냈다. 같은 창으로 T002에 붙는다.
+first_session = [x.id for x in core.get_task(task_id).sessions if x.client == "Claude Code"][0]
+again = a.tool("join_task", {"task_id": "T002", "session_title": "2차 이어서"})
+check("끝낸 창이 다음 타스크에 붙으면 새 세션으로 이어진다",
+      again.get("session_id") not in (None, first_session) and "새 세션" in again.get("note", ""),
+      again.get("note", "")[:50])
+check("앞 세션은 완료로 그대로 남는다",
+      [x.status for x in core.get_task(task_id).sessions if x.id == first_session] == ["완료"])
+a.tool("report_progress", {"message": "2차에서 한 줄"})
+check("새 세션의 보고는 T002에 쌓인다",
+      core.get_task("T002").sessions[0].progress[0]["msg"] == "2차에서 한 줄")
+a.tool("complete_session", {"summary": "2차 끝"})
+
 a.close()
 b.close()
 check("창을 닫아도 완료 세션은 완료로 남는다",
