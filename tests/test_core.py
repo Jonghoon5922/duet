@@ -342,3 +342,41 @@ def test_제목을_고쳐도_프로젝트_줄은_남는다():
 
     core.set_status(task.id, core.DONE)
     assert core.get_task(task.id).project_override == "nefss"
+
+
+def test_별칭표에_적은_이름이_폴더_이름을_대신한다():
+    (core.home() / core.ALIAS_FILENAME).write_text(
+        "# 폴더 이름과 부르는 이름이 다를 때\n"
+        "C:/project/bookshelf = 서재\n"
+        "\n"
+        "잘못된 줄은 건너뛴다\n",
+        encoding="utf-8",
+    )
+    assert core.project_name(r"C:\project\bookshelf") == "서재", "구분자가 달라도 같은 폴더다"
+    assert core.project_name(r"c:\PROJECT\BOOKSHELF") == "서재", "윈도우는 대소문자를 안 가린다"
+    assert core.project_name(r"C:\project\duet") == "duet", "안 적은 폴더는 폴더 이름 그대로"
+
+
+def test_별칭표가_없어도_돈다():
+    assert not (core.home() / core.ALIAS_FILENAME).exists()
+    assert core.project_name(r"C:\project\duet") == "duet"
+
+
+def test_클라이언트가_붙인_대화_id를_남긴다():
+    """우리 세션 id는 프로세스를, 이건 대화를 가리킨다. 둘은 다르다."""
+    s = core.register_session("Claude Code", cwd=r"C:\project\duet",
+                              client_session="9772ea0d-4c14-48e0-aff9-f5a8ebbcc2a8")
+    assert s.id.startswith("s-")
+    assert s.client_session == "9772ea0d-4c14-48e0-aff9-f5a8ebbcc2a8"
+    assert core.read_session(s.path).client_session == s.client_session
+
+
+def test_비슷한_타스크를_찾아준다():
+    """같은 일이 두 벌로 쌓이는 것이 제일 흔한 실수다."""
+    core.create_task("대시보드 만들기")
+    done = core.create_task("세션 타임라인 붙이기")
+    core.set_status(done.id, core.DONE)
+
+    assert [t.title for t in core.similar_tasks("대시보드 필터 만들기")] == ["대시보드 만들기"]
+    assert core.similar_tasks("세션 타임라인 고치기") == [], "닫힌 것은 후보가 아니다"
+    assert core.similar_tasks("전혀 다른 일") == []

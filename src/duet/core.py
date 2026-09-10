@@ -39,6 +39,7 @@ from typing import Any
 HOME_ENV = "DUET_HOME"
 IDLE_DIRNAME = "_미참여"    # 밑줄을 붙여 탐색기에서 타스크들 위에 고정되게 한다
 ARCHIVE_DIRNAME = "_보관"  # 끝난 타스크를 치워 두는 곳. 지우는 것이 아니다
+ALIAS_FILENAME = "프로젝트.md"  # 폴더 경로 = 부르는 이름
 
 HEARTBEAT_SEC = 30.0
 STALE_SEC = 90.0  # 이만큼 하트비트가 없으면 죽은 세션이다
@@ -92,6 +93,9 @@ class Session:
     status: str = RUNNING  # 참여 여부는 파일이 어느 폴더에 있느냐로 안다
     #: 이 세션이 뜬 폴더. 어느 프로젝트에서 일하는지가 여기서 나온다.
     cwd: str = ""
+    #: 클라이언트가 붙인 대화 id (Claude Code라면 대화 기록 파일 이름과 같다).
+    #: 우리 id와 따로 둔다 — 우리 것은 프로세스 하나를 가리키고, 이건 대화를 가리킨다.
+    client_session: str = ""
     started: str = ""
     heartbeat: str = ""
     summary: str = ""
@@ -118,6 +122,7 @@ class Session:
             "title": self.title,
             "client": self.client,
             "cwd": self.cwd,
+            "client_session": self.client_session,
             "status": self.shown_status,
             "by_human": self.by_human,
             "alive": self.alive,
@@ -345,6 +350,24 @@ def create_task(title: str, description: str = "", project: str = "") -> Task:
     return _read_task(task_dir)
 
 
+def similar_tasks(title: str, limit: int = 3) -> list[Task]:
+    """제목이 겹치는 **열린** 타스크. 같은 일을 두 번 만들지 않게 미리 보여준다.
+
+    똑똑하게 재지 않는다 — 낱말이 하나라도 겹치면 후보다. 판단은 부른 쪽이 한다.
+    """
+    words = {w for w in re.split(r"[\s·,]+", title.lower()) if len(w) > 1}
+    found = []
+    for task in list_tasks():
+        if task.status in (DONE, "취소"):
+            continue
+        other = {w for w in re.split(r"[\s·,]+", task.title.lower()) if len(w) > 1}
+        overlap = words & other
+        nested = title.lower() in task.title.lower() or task.title.lower() in title.lower()
+        if overlap or nested:
+            found.append(task)
+    return found[:limit]
+
+
 def get_task(task_id: str | int) -> Task:
     return _read_task(find_task(task_id))
 
@@ -398,25 +421,61 @@ def set_status(task_id: str | int, status: str | None) -> Task:
 # --- 세션 -----------------------------------------------------------------
 
 
+def aliases() -> dict[str, str]:
+    """`~/.duet/프로젝트.md` — 폴더 경로에 붙일 이름.
+
+    폴더 이름과 부르는 이름이 다를 때가 있다 (`C:\\project\\bookshelf` 를 "서재"라
+    부르는 식). MCP는 클라이언트가 화면에 뭐라고 띄우는지 알려주지 않으므로 — 그건
+    앱마다 다르고 문서화된 것도 아니다 — 한 줄 적어 두는 쪽을 택했다.
+
+    ```
+    C:\\project\\bookshelf = 서재
+    ```
+    """
+    path = home() / ALIAS_FILENAME
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+
+    found = {}
+    for line in text.splitlines():
+        if line.startswith("#") or "=" not in line:
+            continue
+        folder, _, name = line.partition("=")
+        folder, name = folder.strip(), name.strip()
+        if folder and name:
+            # 윈도우는 대소문자를 가리지 않고 구분자도 섞여 들어온다.
+            found[str(Path(folder)).lower()] = name
+    return found
+
+
 def project_name(cwd: str) -> str:
     """세션이 뜬 폴더에서 프로젝트 이름을 짚는다.
 
-    Claude Code는 프로젝트 폴더에서 뜨므로 그 폴더 이름이 곧 프로젝트다. 하지만
-    Claude Desktop처럼 엉뚱한 데서 뜨는 클라이언트도 있어서, 프로젝트로 볼 수 없는
-    이름이면 빈 문자열을 준다 — **모르면 모른다고 두는 편이 틀린 이름보다 낫다.**
+    Claude Code는 프로젝트 폴더에서 뜨므로 그 폴더 이름이 곧 프로젝트다. 별칭표에
+    적어 둔 경로면 그 이름을 쓴다. 프로젝트로 볼 수 없는 폴더에서 떴으면 (Claude
+    Desktop처럼 엉뚱한 데서 뜨는 클라이언트가 있다) 빈 문자열을 준다 —
+    **모르면 모른다고 두는 편이 틀린 이름보다 낫다.**
     """
     if not cwd:
         return ""
+    named = aliases().get(str(Path(cwd)).lower())
+    if named:
+        return named
     name = Path(cwd).name.strip()
     if name.lower() in NOT_PROJECT or name.startswith("."):
         return ""
     return name
 
 
-def register_session(client: str = "알 수 없음", cwd: str = "") -> Session:
+def register_session(
+    client: str = "알 수 없음", cwd: str = "", client_session: str = ""
+) -> Session:
     """서버 프로세스가 뜰 때 자기 파일을 `_미참여/`에 만든다."""
     session = Session(
-        id="s-" + uuid.uuid4().hex[:8], client=client, cwd=cwd, started=now(), heartbeat=now()
+        id="s-" + uuid.uuid4().hex[:8], client=client, cwd=cwd,
+        client_session=client_session, started=now(), heartbeat=now(),
     )
     session.path = home() / IDLE_DIRNAME / f"{session.id}.json"
     session.save()

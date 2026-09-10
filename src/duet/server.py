@@ -64,6 +64,8 @@ def build_instructions() -> str:
         "이 세션은 아직 어떤 타스크에도 참여하지 않았다. 사용자가 작업을 지시하면 어느 타스크인지 "
         "확인하고 join_task를 호출하라. 새 일이면 create_task 후 join_task.",
         "작업 중간에 report_progress로 한 줄씩 남기고, 끝나면 complete_session을 호출하라.",
+        "타스크는 끝을 판정할 수 있는 한 덩어리다. 세션 하나로 끝날 잔일이면 만들지 말고 그냥 해라.",
+        "프로젝트는 만드는 것이 아니다 — 세션이 뜬 폴더가 곧 프로젝트다.",
         "사용자가 타스크를 언급하지 않으면 묻지 말고 작업을 먼저 하되, 첫 보고 시점에 한 번만 확인한다.",
     ]
     return "\n".join(lines)
@@ -103,14 +105,35 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
         name="create_task",
         description=(
             "새 타스크를 만든다(`대기`). 참여까지 하지는 않으므로, 이 세션이 그 일을 "
-            "할 것이면 이어서 join_task를 호출하라. project는 보통 비워 둔다 — "
-            "이 세션이 join하면 세션이 뜬 폴더에서 저절로 정해진다."
+            "할 것이면 이어서 join_task를 호출하라.\n"
+            "**제목 짓는 법**: 끝을 판정할 수 있는 한 덩어리로. 결과물로 쓰고 대화로 쓰지 마라 "
+            "(X: '리팩터링 논의', '이것저것 수정' / O: '결제 모듈 리팩터링', '세션 타임라인 붙이기'). "
+            "프로젝트 이름은 넣지 마라 — 이미 프로젝트로 묶여 있다 "
+            "(X: 'Duet 대시보드 만들기' / O: '대시보드 만들기'). "
+            "세션 하나로 끝날 잔일이면 타스크를 만들지 말고 그냥 해라.\n"
+            "**project**: 보통 비워 둔다. 이 세션이 join하면 세션이 뜬 폴더에서 저절로 정해진다. "
+            "다른 프로젝트 일을 대신 만들 때만 적는다.\n"
+            "비슷한 타스크가 이미 있으면 만들지 않고 후보를 돌려준다. 같은 일이면 그것에 "
+            "join하고, 정말 다른 일이면 confirm=true로 다시 불러라."
         ),
     )
     def create_task_tool(
-        ctx: Context, title: str, description: str = "", project: str = ""
+        ctx: Context,
+        title: str,
+        description: str = "",
+        project: str = "",
+        confirm: bool = False,
     ) -> dict[str, Any]:
         touch(ctx)
+        if not confirm:
+            # 같은 일이 두 벌로 쌓이는 것이 이 도구에서 제일 흔한 실수다.
+            similar = core.similar_tasks(title)
+            if similar:
+                return {
+                    "만들지_않았다": "비슷한 타스크가 이미 있다.",
+                    "후보": [t.to_dict() for t in similar],
+                    "next": "같은 일이면 join_task로 붙어라. 정말 다른 일이면 confirm=true로 다시 불러라.",
+                }
         try:
             task = core.create_task(title, description, project)
         except (core.DuetError, OSError) as e:
@@ -272,7 +295,12 @@ def create_server(session: core.Session, lock: threading.Lock) -> MCPServer:
 
 def serve() -> None:
     """이 함수가 도는 동안이 곧 세션 하나의 수명이다."""
-    session = core.register_session(client=_guess_client(), cwd=str(Path.cwd()))
+    session = core.register_session(
+        client=_guess_client(),
+        cwd=str(Path.cwd()),
+        # Claude Code가 이 대화에 붙인 id. 대화 기록 파일 이름이 이것이다.
+        client_session=os.environ.get("CLAUDE_CODE_SESSION_ID", ""),
+    )
     lock = threading.Lock()
     stop = threading.Event()
     closed = threading.Event()

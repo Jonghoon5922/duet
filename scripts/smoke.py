@@ -91,6 +91,12 @@ print(f"DUET_HOME = {HOME}\n")
 a = Client()
 check("A 연결, instructions에 안내가 있다", "join_task" in a.instructions)
 task_id = a.tool("create_task", {"title": "pc101pm 전환", "description": "NEFSS→BXM"})["task"]["id"]
+
+again = a.tool("create_task", {"title": "pc101pm 전환 2차"})
+check("비슷한 제목이면 만들지 않고 후보를 준다", "만들지_않았다" in again,
+      str([t["title"] for t in again.get("후보", [])]))
+forced = a.tool("create_task", {"title": "pc101pm 전환 2차", "confirm": True})
+check("confirm을 주면 그래도 만든다", forced.get("task", {}).get("id") == "T002")
 md_before = (core.find_task(task_id) / "task.md").read_text(encoding="utf-8")
 
 joined = a.tool("join_task", {"task_id": task_id, "session_title": "DBIO 계층 전환"})
@@ -180,8 +186,11 @@ check("타스크 닫기 → 남은 중지가 정리되고 완료", closed.status
 check("닫은 뒤에는 경고가 없다", closed.warning == "", closed.warning)
 
 core.archive_task(task_id)
-check("보관하면 보드에서 빠진다", core.list_tasks() == [] and len(core.list_archived()) == 1)
-check("되돌리면 돌아온다", core.unarchive_task(task_id).id == task_id and core.list_archived() == [])
+check("보관하면 보드에서 빠진다",
+      task_id not in [t.id for t in core.list_tasks()]
+      and [t.id for t in core.list_archived()] == [task_id])
+check("되돌리면 돌아온다",
+      core.unarchive_task(task_id).id == task_id and core.list_archived() == [])
 
 print()
 print("실패 있음" if FAILED else "전부 통과")
