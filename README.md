@@ -71,7 +71,7 @@ MCP는 클라이언트가 화면에 무슨 이름을 띄우는지 알려주지 �
 ## 대시보드
 
 ```bash
-duet ui        # http://127.0.0.1:8737
+uv run --no-sync --directory C:/project/duet duet ui   # http://127.0.0.1:8737
 ```
 
 위에 상태별 집계 타일(누르면 필터), 아래에 카드 그리드. 카드마다 상태 띠·진행 막대·세션 줄이 있고,
@@ -140,7 +140,7 @@ duet ui        # http://127.0.0.1:8737
   "mcpServers": {
     "duet": {
       "command": "uv",
-      "args": ["run", "duet", "serve"],
+      "args": ["run", "--no-sync", "duet", "serve"],
       "cwd": "C:/project/duet"
     }
   }

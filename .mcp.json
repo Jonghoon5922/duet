@@ -2,7 +2,7 @@
   "mcpServers": {
     "duet": {
       "command": "uv",
-      "args": ["run", "duet", "serve"],
+      "args": ["run", "--no-sync", "duet", "serve"],
       "cwd": "C:/project/duet"
     }
   }
