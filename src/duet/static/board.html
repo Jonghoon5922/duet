@@ -147,8 +147,13 @@ dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
 
 /* 프로젝트 상자 */
 .pcard{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.phead{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line-2);background:var(--panel-2)}
-.phead h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.phead{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;user-select:none}
+.phead:hover{background:var(--line-2)}
+.phead h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
+.phead h2 .caret{display:inline-block;font-size:10px;color:var(--ink-3);transition:transform .15s}
+.pcard.folded .phead{border-bottom:0}
+.pcard.folded .phead h2 .caret{transform:rotate(-90deg)}
+.pcard.folded .trows,.pcard.folded .pempty{display:none}
 .pc{font-size:12px;color:var(--ink-3)}
 .pempty{padding:14px 16px;color:var(--ink-3);font-size:12.5px}
 
@@ -257,6 +262,9 @@ let query = "";
 let archived = false;   // 보관함을 보고 있나
 let drawn = null;       // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
 const opened = new Set();  // 펼쳐 둔 타스크 ref·세션 id
+// 접어 둔 프로젝트. 새로고침해도 접힌 채로 — 화면 코드가 바뀌면 탭이 스스로 다시 뜨기 때문에 브라우저에 둔다.
+const folded = new Set((() => { try { return JSON.parse(localStorage.getItem("duet.folded") || "[]"); } catch (_) { return []; } })());
+const rememberFolded = () => { try { localStorage.setItem("duet.folded", JSON.stringify([...folded])); } catch (_) {} };
 let newTaskProject = "";   // 새 타스크 대화상자가 열린 프로젝트
 let about = { version: "", repo: "", projects: 0 };  // 피드백 본문 끝에 붙일 것
 let page = null;   // 이 탭이 처음 받은 화면 도장. 서버 것이 달라지면 화면 코드가 바뀐 것이다
@@ -493,17 +501,27 @@ function projectButtons(name, list) {
 function projectCard(name, list) {
   const running = list.filter((t) => t.status === "진행중").length;
   const attention = list.filter((t) => t.status === "확인 필요").length;
-  return el("article", { className: "pcard" },
-    el("div", { className: "phead" },
-      el("h2", { textContent: name || UNSORTED }),
+  const key = name || UNSORTED;
+  const head = el("div", { className: "phead", title: "Click to fold or unfold" },
+      el("h2", {}, el("span", { className: "caret", textContent: "▼" }), el("span", { textContent: key })),
       el("span", { className: "spacer" }),
       running ? el("span", { className: "tag s-진행중", textContent: `${running} running` }) : null,
       attention ? el("span", { className: "tag s-확인필요", textContent: `${attention} needs review` }) : null,
       el("span", { className: "pc mono", textContent: plural(list.length, "task") }),
-      el("span", { className: "acts" }, projectButtons(name, list))),
+      el("span", { className: "acts" }, projectButtons(name, list)));
+  const card = el("article", { className: "pcard" + (folded.has(key) ? " folded" : "") },
+    head,
     list.length
       ? el("div", { className: "trows" }, list.map(taskRow))
       : el("div", { className: "pempty", textContent: "No tasks yet. Add one with + Task." }));
+  // 머리 아무 데나 누르면 접힌다. 버튼(+ Task·Archive·×)은 자기 일만 한다.
+  head.onclick = (e) => {
+    if (e.target.closest("button")) return;
+    card.classList.toggle("folded");
+    card.classList.contains("folded") ? folded.add(key) : folded.delete(key);
+    rememberFolded();
+  };
+  return card;
 }
 
 /* ---------- 그리기 ---------- */
