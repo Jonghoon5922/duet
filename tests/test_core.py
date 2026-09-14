@@ -252,6 +252,38 @@ def test_살아있는_세션이_있으면_프로젝트를_보관하지_않는다
     assert len(core.list_tasks()) == 2
 
 
+def test_프로젝트를_지운다():
+    core.create_task("하나", project="nefss")
+    live = core.create_task("도는 것", project="nefss")
+    core.create_task("남의 것", project="duet")
+    s = core.register_session()
+    core.join(s, live.ref)
+    with pytest.raises(core.DuetError, match="살아 있는 세션"):
+        core.delete_project("nefss")
+    core.finish(s, core.DONE, "끝")
+    assert core.delete_project("nefss") == "nefss"
+    assert core.projects() == ["duet"]
+
+
+def test_타스크를_지운다():
+    task = core.create_task("잘못 만든 것", project="nefss")
+    keep = core.create_task("남길 것", project="nefss")
+    assert core.delete_task(task.ref) == "nefss/T001"
+    assert not task.dir.exists()
+    assert [t.ref for t in core.list_tasks()] == [keep.ref]
+
+
+def test_살아있는_세션이_붙은_타스크는_못_지운다():
+    task = core.create_task("도는 것", project="nefss")
+    s = core.register_session()
+    core.join(s, task.ref)
+    with pytest.raises(core.DuetError, match="살아 있는 세션"):
+        core.delete_task(task.ref)
+    core.finish(s, core.DONE, "끝")
+    core.delete_task(task.ref)
+    assert not task.dir.exists()
+
+
 # --- 그 밖 ------------------------------------------------------------------
 
 

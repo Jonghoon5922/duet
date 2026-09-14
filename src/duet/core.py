@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -709,6 +710,31 @@ def unarchive_project(name: str) -> list[Task]:
 
 
 # --- 정리 -----------------------------------------------------------------
+
+
+def delete_task(ref: str | int, hint: str | None = None) -> str:
+    """타스크 폴더를 지운다. 세션 기록까지 함께 사라진다.
+
+    잘못 만든 것을 치우는 용도다. 끝난 일은 지우지 말고 프로젝트째 보관한다.
+    살아 있는 세션이 붙어 있으면 거부한다 — 그 프로세스가 아직 그 폴더에 쓴다.
+    """
+    task = get_task(ref, hint)
+    if task.counts[RUNNING]:
+        raise DuetError("살아 있는 세션이 붙어 있어 지울 수 없다. 그 창을 닫거나 끝낸 뒤에.")
+    shutil.rmtree(task.dir)
+    return task.ref
+
+
+def delete_project(name: str) -> str:
+    """프로젝트 폴더를 타스크째 지운다. 살아 있는 세션이 하나라도 있으면 거부한다."""
+    folder = project_dir(name)
+    if not folder.is_dir():
+        raise DuetError(f"'{name or UNSORTED_DIRNAME}' 프로젝트가 없다.")
+    busy = [t.ref for t in project_tasks(name) if t.counts[RUNNING]]
+    if busy:
+        raise DuetError(f"살아 있는 세션이 있다: {', '.join(busy)}. 창을 닫은 뒤에 지운다.")
+    shutil.rmtree(folder)
+    return folder.name
 
 
 def close_task(ref: str | int, reason: str = "사람이 타스크를 닫았다", hint: str | None = None) -> Task:

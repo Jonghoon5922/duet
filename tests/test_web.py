@@ -132,6 +132,24 @@ def test_화면에서_프로젝트를_옮긴다(client):
     assert client.get("/api/tasks/nefss/T001").status_code == 404
 
 
+def test_화면에서_프로젝트를_지운다(client):
+    core.create_task("하나", project="nefss")
+    assert client.delete("/api/projects/nefss").json()["deleted"] == "nefss"
+    assert client.get("/api/tasks").json()["projects"] == []
+    assert client.delete("/api/projects/nefss").status_code == 400
+
+
+def test_화면에서_타스크를_지운다(client):
+    task = core.create_task("잘못 만든 것", project="nefss")
+    assert client.delete(f"/api/tasks/{task.ref}").json()["deleted"] == "nefss/T001"
+    assert client.get("/api/tasks/nefss/T001").status_code == 404
+
+    live = core.create_task("도는 것", project="nefss")
+    s = core.register_session()
+    core.join(s, live.ref)
+    assert client.delete(f"/api/tasks/{live.ref}").status_code == 400
+
+
 def test_프로젝트를_보관하고_되돌린다(client):
     core.create_task("하나", project="nefss")
     core.create_task("둘", project="nefss")
