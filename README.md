@@ -154,7 +154,8 @@ duet ui        # http://127.0.0.1:8737
 
 ## 설치
 
-`dist\duet-setup-<버전>.exe` 하나를 실행한다. 파이썬도 uv도 필요 없다. 관리자 권한도 묻지 않는다.
+[Releases](https://github.com/Jonghoon5922/duet/releases/latest)에서 `duet-setup-<버전>.exe`를 받아 실행한다.
+파이썬도 uv도 필요 없다. 관리자 권한도 묻지 않는다. 새 버전도 같은 파일을 받아 덮어 설치하면 된다 (Claude 창은 닫고).
 
 1. 시작 전에 "Claude 창을 모두 닫아 주세요" 안내 → 닫고 [확인]
 2. 체크박스 "Claude Code에 연결합니다" — 켜진 채로 [설치]
