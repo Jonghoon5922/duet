@@ -315,6 +315,8 @@ def test_프로젝트_이름은_세션이_뜬_폴더에서_나온다():
     assert core.project_name("C:/project/duet") == "duet"
     assert core.project_name("") == ""
     assert core.project_name("C:/Windows/System32") == ""
+    assert core.project_name("C:/Users/me/AppData/Local/scratch-2026-09-14-b6b798") == "", "앱이 만든 임시 폴더"
+    assert core.project_name("C:/project/scratchpad-tools") == "scratchpad-tools", "이름에 scratch가 들어가도 폴더면 폴더"
     (core.home() / core.ALIAS_FILENAME).write_text("C:/project/bookshelf = 서재\n", encoding="utf-8")
     assert core.project_name("C:\\project\\bookshelf") == "서재"
 

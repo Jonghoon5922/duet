@@ -73,6 +73,8 @@ META_LINE = re.compile(r"^(?:상태|프로젝트):\s*.*$")
 
 #: 프로젝트 이름으로 삼지 않을 폴더. 여기서 세션이 떴다면 프로젝트를 안 것이 아니다.
 NOT_PROJECT = frozenset({"", "/", "\\", "system32", "windows", "desktop", "바탕 화면", "temp", "tmp"})
+#: 폴더 이름이 이렇게 생겼으면 프로젝트가 아니라 앱이 만든 임시 폴더다 (Claude 데스크탑의 scratch-날짜-해시 등).
+TEMP_FOLDER = re.compile(r"^(scratch|tmp|temp)[-_.]", re.IGNORECASE)
 BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
@@ -568,7 +570,7 @@ def project_name(cwd: str) -> str:
     if named:
         return named
     name = Path(cwd).name.strip()
-    if name.lower() in NOT_PROJECT or name.startswith("."):
+    if name.lower() in NOT_PROJECT or name.startswith(".") or TEMP_FOLDER.match(name):
         return ""
     return name
 
