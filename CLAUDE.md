@@ -1,5 +1,8 @@
 # Duet
 
+> **이 저장소는 참고용이다.** Duet은 2026-09-14에 tokenbill-mcp(`C:\project\tokenbill\tokenbill\uploader\duet\`, JS)로 옮겨 심었고,
+> 앞으로 손보는 곳은 그쪽이다. 여기 Python 판은 규칙의 원본이자 인스톨러 배포판으로 남긴다. 기록 형식(`~/.duet`)은 같다.
+
 나와 Claude가 함께 하는 일을 타스크로 묶고, 세션이 다 끝나면 타스크가 닫히는 **개인용 로컬 PMS**. MCP로 세션이 상태를 보고하고, 로컬 대시보드에서 사람이 보고 고친다. 패키지 `duet-mcp`, CLI `duet`.
 
 **작업 시작 전 `SPEC.md`를 먼저 읽는다.** 서재(`C:\project\bookshelf`)와 같은 스택·같은 배포 방식이므로 그쪽 코드(FastMCP 서버, 웹 UI, 인스톨러)를 재사용한다.
@@ -44,6 +47,7 @@ Python 3.11+, uv, MCP(MCPServer), FastAPI + SSE, 정적 HTML 한 장
 - [x] 보드는 MCP 서버가 겸한다 (창이 열려 있으면 늘 켜짐) + 창 없는 duet-board.exe
 - [x] 폴링 걷어내기: 서버가 파일 지문을 반 초마다 보고 바뀔 때만 SSE로 알림. `app` 창은 안 만들기로 (T003 취소)
 - [x] GitHub Release에 인스톨러 (v0.2.0부터)
+- [x] tokenbill-mcp로 옮겨 심음 (JS 포팅, 도구 8개·보드·SSE·테스트·스모크). 이후 개발은 tokenbill에서
 - [ ] 5단계 나머지: PyPI `duet-mcp`, `.mcpb`, 코드 서명
 
 단계를 끝내면 위 체크박스를 갱신한다.

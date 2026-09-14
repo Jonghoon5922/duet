@@ -1,5 +1,10 @@
 # Duet
 
+> **2026-09-14부터 Duet은 [tokenbill-mcp](https://github.com/Jonghoon5922/tokenbill) 안에 들어 있다** (`uploader/duet/`, JS).
+> `npx -y tokenbill-mcp@latest` 하나로 토큰 업로드·대화 뷰어·Duet 보드가 같이 뜨고, Mac에서도 되고, 인스톨러가 필요 없다.
+> 이 저장소의 Python 판은 **참고용**으로 남긴다 — 규칙·보드·기록 형식(`~/.duet`)은 둘이 같아서 어느 쪽으로 만든 기록이든 서로 읽는다.
+> 앞으로 손보는 곳은 tokenbill 쪽이다.
+
 Claude Code 창에서 한 일이 **저절로 기록되는 개인용 보드.**
 창을 열고 평소처럼 일을 시키면, Claude가 타스크를 만들고 붙고 진행을 남기고 끝내면 완료 보고를 한다.
 보드는 그걸 프로젝트별로 보여준다. DB도 서버도 계정도 없다 — 내 PC의 폴더 하나가 전부다.
