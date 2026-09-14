@@ -27,6 +27,8 @@ PAGE = Path(__file__).parent / "static" / "board.html"
 DEFAULT_HOST = "127.0.0.1"
 #: 딴 프로그램이 이 포트를 쓰면 DUET_PORT 로 바꾼다.
 DEFAULT_PORT = int(os.environ.get("DUET_PORT", "8737"))
+#: 피드백이 가는 곳. 보드가 GitHub 새 이슈 화면을 채워서 연다 — Duet 자신은 네트워크를 쓰지 않는다.
+REPO_URL = "https://github.com/Jonghoon5922/duet"
 
 
 class StatusIn(BaseModel):
@@ -88,8 +90,8 @@ def create_app() -> FastAPI:
             "statuses": list(core.TASK_STATUSES),
             "home": str(core.home()),
             "archived": len({t.project for t in core.list_archived()}),
-            # 대시보드를 띄운 폴더. 지금 어느 프로젝트를 보고 있는지의 기준이다.
-            "here": core.project_name(str(Path.cwd())),
+            "version": __version__,
+            "repo": REPO_URL,
         }
 
     @app.post("/api/tasks", status_code=201)
@@ -99,7 +101,8 @@ def create_app() -> FastAPI:
     @app.get("/api/archive")
     def archive() -> dict[str, Any]:
         rows = [t.to_detail() for t in core.list_archived()]
-        return {"tasks": rows, "archived": len({t.project for t in core.list_archived()}), "home": str(core.home())}
+        return {"tasks": rows, "archived": len({t.project for t in core.list_archived()}), "home": str(core.home()),
+                "version": __version__, "repo": REPO_URL}
 
     @app.post("/api/projects/archive")
     def archive_project(body: ProjectIn) -> dict[str, Any]:

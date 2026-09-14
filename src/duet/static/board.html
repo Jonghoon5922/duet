@@ -133,6 +133,7 @@ dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);bor
 dialog::backdrop{background:rgba(10,12,16,.45)}
 dialog form{padding:20px}
 dialog h2{margin:0 0 14px;font-size:16px}
+dialog .note{margin:-4px 0 12px;font-size:12px;color:var(--ink-3)}
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
 .field label{font-size:12px;color:var(--ink-2);font-weight:500}
 .field input,.field textarea{border:1px solid var(--line);background:var(--panel-2);border-radius:8px;padding:8px 10px}
@@ -179,6 +180,7 @@ dialog h2{margin:0 0 14px;font-size:16px}
       <div class="sub"><span class="pulse" id="pulse"></span><span id="state">Connecting…</span></div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn" id="feedback" title="Report a bug or suggest something — opens a GitHub issue">Feedback</button>
       <button class="btn" id="archive" aria-pressed="false">Archived</button>
       <button class="btn primary" id="new">+ New Project</button>
     </div>
@@ -219,6 +221,19 @@ dialog h2{margin:0 0 14px;font-size:16px}
     </div>
   </form>
 </dialog>
+<!-- 피드백 = GitHub 이슈. 여기서 적은 글을 새 이슈 화면에 채워서 연다. 보내는 것은 브라우저다. -->
+<dialog id="dlgFeedback">
+  <form id="frmFeedback">
+    <h2>Feedback</h2>
+    <div class="field"><label for="fbTitle">Title</label><input id="fbTitle" required placeholder="What's wrong, or what would help"></div>
+    <div class="field"><label for="fbBody">Details (optional)</label><textarea id="fbBody" placeholder="What you did, what you expected, what happened"></textarea></div>
+    <p class="note">Opens a new GitHub issue with this filled in. You submit it there.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="fbCancel">Cancel</button>
+      <button type="submit" class="btn primary">Open issue</button>
+    </div>
+  </form>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -243,6 +258,7 @@ let archived = false;   // 보관함을 보고 있나
 let drawn = null;       // 마지막으로 그린 내용. 같으면 다시 그리지 않는다.
 const opened = new Set();  // 펼쳐 둔 타스크 ref·세션 id
 let newTaskProject = "";   // 새 타스크 대화상자가 열린 프로젝트
+let about = { version: "", repo: "", projects: 0 };  // 피드백 본문 끝에 붙일 것
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => {
@@ -557,7 +573,8 @@ async function refresh(force = false) {
     const data = await api(archived ? "/api/archive" : "/api/tasks");
     const count = archived ? new Set(data.tasks.map((t) => t.project)).size : (data.projects || []).length;
     $("#pulse").classList.add("on");
-    $("#pulse").title = data.home;  // 경로는 볼 일이 드물다. 점에 마우스를 올리면 나온다
+    $("#pulse").title = data.home;
+    about = { version: data.version || "", repo: data.repo || "", projects: count };  // 경로는 볼 일이 드물다. 점에 마우스를 올리면 나온다
     $("#state").textContent = `${archived ? "Archive" : "Live"} · ${plural(count, "project")} · ${plural(data.tasks.length, "task")}`;
     // 보관함 안에서는 같은 버튼이 "돌아가기"다. 토글이라는 걸 사람이 알 필요 없다.
     $("#archive").textContent = archived ? "← Board" : (data.archived ? `Archived ${data.archived}` : "Archived");
@@ -630,6 +647,20 @@ $("#frmTask").addEventListener("submit", async (e) => {
     toast(`Created [${task.ref}] ${task.title}`);
     refresh(true);
   } catch (err) { toast(err.message); }
+});
+
+// 피드백. GitHub 새 이슈 주소에 제목·본문을 실어 새 탭으로 연다. 토큰도 서버 호출도 없다.
+$("#feedback").addEventListener("click", () => { $("#frmFeedback").reset(); $("#dlgFeedback").showModal(); $("#fbTitle").focus(); });
+$("#fbCancel").addEventListener("click", () => $("#dlgFeedback").close());
+submitOnEnter($("#fbTitle"), $("#frmFeedback"));
+$("#frmFeedback").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const title = $("#fbTitle").value.trim();
+  if (!title) return;
+  const body = `${$("#fbBody").value.trim()}\n\n---\nDuet ${about.version} · ${archived ? "archive" : "board"} · ${plural(about.projects, "project")} · ${plural(tasks.length, "task")} · ${navigator.userAgent}`;
+  const url = `${about.repo}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(url, "_blank", "noopener");
+  $("#dlgFeedback").close();
 });
 
 refresh();
