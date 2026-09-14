@@ -4,6 +4,10 @@
 > MCP로 세션이 스스로 상태를 보고하고, 대시보드에서 사람이 한눈에 보고 고친다.
 > 패키지명 `duet-mcp`, CLI 명령 `duet`.
 
+> **이 문서는 2026-09-09의 설계 초안이다.** 만들면서 바뀐 것이 많다 — 저장 배치(§5), 상태 이름(§3),
+> 도구 목록(§6), 보드(§7), CLI(§8). **지금 모습은 README.md와 CLAUDE.md가 맞고**, 이 문서는 왜 이렇게
+> 만들었는지(§2·§4·§9)를 보려고 남겨 둔다. 어긋난 절에는 메모를 달았다.
+
 ## 0. 시작 전 확인 (Sprintra)
 
 같은 자리에 [Sprintra](https://sprintra.io)가 있다 — MCP 네이티브, 로컬 우선 SQLite, 에이전트 프레즌스, 세션 리플레이, 스프린트·칸반. 개인 무료.
@@ -40,6 +44,9 @@
 "내가 Claude를 몇 개 띄워서 뭘 시켰고 지금 어디까지 왔나"가 손대지 않아도 보인다.
 
 ## 3. 개념 모델
+
+> 메모: 타스크 상태는 `대기·진행중·확인 필요·완료·보류·취소`, 세션은 `진행중·완료·중지`. 사람은 완료·보류·취소만 고른다. 화면에서는 영문으로 보인다.
+
 
 ```
 타스크 (task)
@@ -123,6 +130,9 @@ join_task를 호출하라. 새 일이면 create_task 후 join_task. 작업 중�
 
 ## 6. MCP 도구
 
+> 메모: 실제 도구는 `list_tasks·create_task·join_task·get_task·update_task·report_progress·complete_session·pause_session` 여덟 개. `tags`·이력 절은 없다. 타스크는 `duet/T001`로 부른다.
+
+
 | 도구 | 입력 | 동작 |
 |---|---|---|
 | `list_tasks` | `status?` | 타스크 목록 (세션 수·상태·마지막 활동) |
@@ -135,6 +145,9 @@ join_task를 호출하라. 새 일이면 create_task 후 join_task. 작업 중�
 | `update_task` | `task_id`, `status?`, `title?`, `description?` | `task.md` 편집 + 이력 절에 기록 |
 
 ## 7. 대시보드 (로컬 웹, 127.0.0.1)
+
+> 메모: 프로젝트 상자 + 타스크 줄. 상태 칩 필터, 검색, +New Project, +Task, Archive, ×, Feedback. 2초 폴링(SSE는 아직). 글은 영문.
+
 
 `duet ui` 또는 `duet app`(자체 창, 서재 방식).
 
@@ -152,6 +165,9 @@ join_task를 호출하라. 새 일이면 create_task 후 join_task. 작업 중�
 **실시간**: 파일 감시 → SSE로 새로고침 없이 갱신
 
 ## 8. CLI
+
+> 메모: `serve·ui·add·list·show·version·mcp-register·mcp-unregister·mcp-list`. `set`·`sessions`는 없다 — 보드가 대신한다.
+
 
 | 명령 | 동작 |
 |---|---|
