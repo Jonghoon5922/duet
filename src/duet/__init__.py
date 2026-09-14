@@ -2,4 +2,4 @@
 
 #: 이 프로젝트 버전의 **유일한 출처**다.
 #: pyproject.toml 은 hatchling 으로 여기를 읽는다(어긋날 수 없다).
-__version__ = "0.1.0"
+__version__ = "0.2.0"

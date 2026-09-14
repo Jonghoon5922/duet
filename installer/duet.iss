@@ -1,8 +1,7 @@
 ; Duet 설치 마법사 — Inno Setup 6
 ;
 ; 빌드 순서:
-;   1) .venv\Scripts\pyinstaller.exe installer\duet.spec --noconfirm --distpath dist\app
-;   2) ISCC.exe installer\duet.iss
+;   uv run --no-sync python scripts\build.py   (검사 → PyInstaller → ISCC /DAppVersion=<버전>)
 ;
 ; 관리자 권한을 요구하지 않는다. 사용자 폴더에 설치하므로 UAC 창이 뜨지 않고,
 ; 회사 PC처럼 권한이 없는 환경에서도 설치된다.
@@ -11,7 +10,9 @@
 ; AppData 가 앱 전용 폴더로 바뀌어 보여서, 거기 둔 실행 파일이 안 잡히는 일이 있었다.
 
 #define AppName "Duet"
-#define AppVersion "0.1.0"
+#ifndef AppVersion
+#define AppVersion "0.0.0"
+#endif
 #define AppPublisher "Jonghoon5922"
 #define AppURL "https://github.com/Jonghoon5922/duet"
 #define AppExe "duet.exe"

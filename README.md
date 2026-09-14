@@ -180,9 +180,11 @@ Claude가 타스크를 만들거나 붙고, 진행을 남기고, 끝내면 완�
 
 ```bash
 uv sync --group dev
-uv run --no-sync pyinstaller installer/duet.spec --noconfirm --distpath dist/app
-"%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe" installer/duet.iss
+uv run --no-sync python scripts/build.py
 ```
+
+단위 테스트 → stdio 스모크 → import 확인 → PyInstaller → 묶인 exe 기동 → Inno Setup 순서로 돌고,
+하나라도 걸리면 인스톨러를 만들지 않는다. 버전은 `src/duet/__init__.py` 한 곳에서 온다.
 
 실행 파일이 둘이다 — `duet.exe`(콘솔, MCP는 stdio가 필요하다)와 `duet-board.exe`(창 없음, 보드).
 무거운 `_internal`은 둘이 나눠 쓴다. 자세한 것은 `installer/`의 각 파일 머리에.
