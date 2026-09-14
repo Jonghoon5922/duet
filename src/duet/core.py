@@ -332,6 +332,27 @@ def task_dirs() -> list[Path]:
     return [t for p in project_dirs() for t in task_dirs_in(p)]
 
 
+def fingerprint() -> str:
+    """`~/.duet` 아래 파일들이 지금 어떤 모양인지 한 줄. 바뀌면 값이 바뀐다.
+
+    보드가 "뭔가 바뀌었나"를 물을 때 쓴다. watchdog 같은 감시기 대신 파일 몇백 개의 수정
+    시각을 훑는다 — 개인용 규모에서 수 ms이고, 프로세스가 하나 더 안 뜬다.
+    """
+    root = home()
+    parts: list[str] = []
+    folders = [root / IDLE_DIRNAME, *project_dirs(root), *task_dirs()]
+    for folder in folders:
+        try:
+            with os.scandir(folder) as it:
+                for entry in it:
+                    if entry.is_file() and (entry.name.endswith(".json") or entry.name == "task.md"):
+                        parts.append(f"{entry.path}:{entry.stat().st_mtime_ns}")
+        except OSError:
+            continue
+    parts.append(str(sorted(p.name for p in folders)))
+    return f"{len(parts)}:{hash(tuple(sorted(parts))) & 0xFFFFFFFF:08x}"
+
+
 def archive_dir() -> Path:
     path = home() / ARCHIVE_DIRNAME
     path.mkdir(parents=True, exist_ok=True)

@@ -284,6 +284,16 @@ def test_살아있는_세션이_붙은_타스크는_못_지운다():
     assert not task.dir.exists()
 
 
+def test_지문은_파일이_바뀔_때만_바뀐다():
+    before = core.fingerprint()
+    assert core.fingerprint() == before, "아무것도 안 했으면 같다"
+    task = core.create_task("하나", project="duet")
+    after = core.fingerprint()
+    assert after != before
+    core.set_status(task.ref, core.DONE)
+    assert core.fingerprint() != after, "task.md 한 줄도 잡는다"
+
+
 # --- 그 밖 ------------------------------------------------------------------
 
 

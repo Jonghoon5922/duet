@@ -6,7 +6,8 @@
 
 타스크 주소는 `/api/tasks/<프로젝트>/<T00n>` 이다. 프로젝트를 모르는 것은 `_미분류`.
 
-지금은 화면이 2초마다 다시 물어본다. 파일 감시(watchdog) + SSE는 뒤 단계에서.
+화면은 `/api/events`(SSE)를 열어 두고, 폴더가 바뀌면 그때만 다시 읽는다. 감시기는
+따로 없다 — 서버가 반 초마다 파일 수정 시각을 훑어 지문이 달라졌을 때만 신호를 보낸다.
 바깥에 열지 않는다. 127.0.0.1만 듣는다.
 """
 
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import __version__, core
@@ -102,6 +103,29 @@ def create_app() -> FastAPI:
             "repo": REPO_URL,
             "page": _page_stamp(),
         }
+
+    @app.get("/api/events")
+    async def events():
+        """폴더가 바뀔 때마다 `change` 한 줄. 15초마다 `ping`으로 연결이 살아 있음을 알린다."""
+        import asyncio
+
+        async def stream():
+            last = core.fingerprint()
+            yield f"event: hello\ndata: {_page_stamp()}\n\n"
+            quiet = 0.0
+            while True:
+                await asyncio.sleep(0.5)
+                quiet += 0.5
+                now = await asyncio.to_thread(core.fingerprint)
+                if now != last:
+                    last, quiet = now, 0.0
+                    yield "event: change\ndata: 1\n\n"
+                elif quiet >= 15:
+                    quiet = 0.0
+                    yield f"event: ping\ndata: {_page_stamp()}\n\n"
+
+        return StreamingResponse(stream(), media_type="text/event-stream",
+                                 headers={"cache-control": "no-cache", "x-accel-buffering": "no"})
 
     @app.post("/api/tasks", status_code=201)
     def new_task(body: TaskIn) -> dict[str, Any]:

@@ -2,7 +2,7 @@
 
 나와 Claude가 함께 하는 일을 타스크로 묶고, 세션이 다 끝나면 타스크가 닫히는 **개인용 로컬 PMS**. MCP로 세션이 상태를 보고하고, 로컬 대시보드에서 사람이 보고 고친다. 패키지 `duet-mcp`, CLI `duet`.
 
-**작업 시작 전 `SPEC.md`를 먼저 읽는다.** 서재(`C:\project\bookshelf`)와 같은 스택·같은 배포 방식이므로 그쪽 코드(FastMCP 서버, 웹 UI, `app` 창, 인스톨러, watchdog)를 재사용한다.
+**작업 시작 전 `SPEC.md`를 먼저 읽는다.** 서재(`C:\project\bookshelf`)와 같은 스택·같은 배포 방식이므로 그쪽 코드(FastMCP 서버, 웹 UI, 인스톨러)를 재사용한다.
 
 ## 만드는 방식
 
@@ -25,7 +25,7 @@
 
 ## 스택
 
-Python 3.11+, uv, FastMCP, watchdog, FastAPI + SSE, 정적 HTML 한 장
+Python 3.11+, uv, MCP(MCPServer), FastAPI + SSE, 정적 HTML 한 장
 
 ## 진행 상태
 
@@ -33,7 +33,7 @@ Python 3.11+, uv, FastMCP, watchdog, FastAPI + SSE, 정적 HTML 한 장
 - [x] 0단계: Sprintra 확인은 건너뛰기로 결정 (SPEC.md §0에 기록). 내 기준으로 만든다
 - [x] 1단계 프로토타입: core.py 하나에 파일 구조와 규칙, MCP 도구 5개 (stdio 실측 13건 통과)
 - [x] 2단계: `get_task`·`pause_session`·`update_task` (인수인계 실측). instructions 주입·중지 감지는 1단계에서 끝냄
-- [x] 3단계: 대시보드 — 집계 타일·필터·검색·카드 그리드·세션 로그 펼치기·인라인 편집·새 타스크 (폴링 2초, SSE는 아직)
+- [x] 3단계: 대시보드 — 집계 타일·필터·검색·카드 그리드·세션 로그 펼치기·인라인 편집·새 타스크
 - [x] 4단계 기본: 세션 상태 수동 변경·타스크 닫기·보관/되돌리기 (브라우저 실동작 확인)
 - [x] 프로젝트 단위: `~/.duet/<프로젝트>/T001-…` — 창이 뜬 폴더가 프로젝트, 번호는 프로젝트 안에서 1부터, 보관은 폴더째, 옛 배치 자동 이관
 - [x] 보드: 프로젝트 상자(+ Task / Archive / ×, 접기), + New Project(이름 + 첫 타스크), 타스크 ×, 글은 영문(상태는 화면에서만)
@@ -42,7 +42,7 @@ Python 3.11+, uv, FastMCP, watchdog, FastAPI + SSE, 정적 HTML 한 장
 - [x] 빌드는 `scripts/build.py` 한 번 — 테스트·스모크·import·exe 기동을 통과해야 인스톨러가 나온다
 - [x] 5단계 인스톨러: PyInstaller 실행 파일 둘 + Inno Setup. 조용히 설치해 등록·MCP·보드 실측
 - [x] 보드는 MCP 서버가 겸한다 (창이 열려 있으면 늘 켜짐) + 창 없는 duet-board.exe
-- [ ] 4단계 나머지: watchdog + SSE로 폴링 걷어내기. `app` 창은 보드 겸하기로 필요성이 줄었다
+- [x] 폴링 걷어내기: 서버가 파일 지문을 반 초마다 보고 바뀔 때만 SSE로 알림. `app` 창은 안 만들기로 (T003 취소)
 - [x] GitHub Release에 인스톨러 (v0.2.0부터)
 - [ ] 5단계 나머지: PyPI `duet-mcp`, `.mcpb`, 코드 서명
 

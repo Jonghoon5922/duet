@@ -687,8 +687,18 @@ $("#frmFeedback").addEventListener("submit", (e) => {
 });
 
 refresh();
-// 폴더를 다시 읽을 뿐이라 싸다. 파일 감시 + SSE는 뒤 단계에서.
-setInterval(refresh, 2000);
+
+// 폴더가 바뀔 때만 다시 읽는다. 서버가 /api/events로 알려준다.
+// 연결이 끊기면 브라우저가 알아서 다시 붙고, 그 사이는 15초 폴링으로 버틴다.
+let fallback = null;
+function listen() {
+  const es = new EventSource("/api/events");
+  es.addEventListener("hello", () => { clearInterval(fallback); fallback = null; refresh(); });
+  es.addEventListener("change", () => refresh());
+  es.addEventListener("ping", (e) => { if (page && e.data && e.data !== page) refresh(); });
+  es.onerror = () => { if (!fallback) fallback = setInterval(refresh, 15000); };
+}
+listen();
 </script>
 </body>
 </html>
