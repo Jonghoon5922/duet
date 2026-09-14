@@ -153,16 +153,6 @@ def create_app() -> FastAPI:
         """사람이 정한 상태를 `task.md`에 적거나(=자동 규칙보다 우선) 지운다."""
         return _run(core.set_status, _ref(project, tid), body.status).to_detail()
 
-    @app.post("/api/tasks/{project}/{tid}/close")
-    def close_task(project: str, tid: str) -> dict[str, Any]:
-        """이 타스크를 닫는다. 살아 있는 세션은 그대로 두고 알려만 준다."""
-        task = _run(core.close_task, _ref(project, tid))
-        alive = task.counts[core.RUNNING]
-        return task.to_detail() | {
-            "note": f"살아 있는 세션 {alive}개는 그대로 둔다. 그 창을 닫으면 스스로 중지로 적힌다."
-            if alive else "닫았다."
-        }
-
     @app.post("/api/tasks/{project}/{tid}/sessions/{session_id}/status")
     def set_session_status(project: str, tid: str, session_id: str, body: StatusIn) -> dict[str, Any]:
         """끝난 세션을 사람이 완료/중지로 바꾼다. 살아 있는 세션은 거부된다."""

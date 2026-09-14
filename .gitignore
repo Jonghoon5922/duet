@@ -2,11 +2,9 @@
 # (DB 없음 — 저장은 ~/.duet/ 아래 파일)
 # OS / 에디터
 # Python
-# 런처 없이 띄우기 위한 의존성 환경 (AppData 밖). scripts/duet-run.cmd 가 쓴다
 *.egg-info/
 *.py[cod]
 .DS_Store
-.duet-env/
 .idea/
 .pytest_cache/
 .ruff_cache/
