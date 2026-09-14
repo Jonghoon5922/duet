@@ -105,18 +105,18 @@ def create_app() -> FastAPI:
     def archive_project(body: ProjectIn) -> dict[str, Any]:
         """프로젝트 폴더째 보관함으로."""
         moved = _run(core.archive_project, body.name)
-        return {"moved": [t.ref for t in moved], "note": f"'{body.name or core.UNSORTED_DIRNAME}'을(를) 보관함으로 옮겼습니다."}
+        return {"moved": [t.ref for t in moved], "note": f"Archived '{body.name or core.UNSORTED_DIRNAME}'"}
 
     @app.post("/api/projects/unarchive")
     def unarchive_project(body: ProjectIn) -> dict[str, Any]:
         moved = _run(core.unarchive_project, body.name)
-        return {"moved": [t.ref for t in moved], "note": f"'{body.name or core.UNSORTED_DIRNAME}'을(를) 보드로 되돌렸습니다."}
+        return {"moved": [t.ref for t in moved], "note": f"Restored '{body.name or core.UNSORTED_DIRNAME}'"}
 
     @app.delete("/api/projects/{name}")
     def delete_project(name: str) -> dict[str, Any]:
         """프로젝트 폴더를 타스크째 지운다. 살아 있는 세션이 있으면 거부."""
         gone = _run(core.delete_project, "" if name == core.UNSORTED_DIRNAME else name)
-        return {"deleted": gone, "note": f"'{gone}' 프로젝트를 지웠습니다."}
+        return {"deleted": gone, "note": f"Deleted project '{gone}'"}
 
     @app.get("/api/tasks/{project}/{tid}")
     def task(project: str, tid: str) -> dict[str, Any]:
@@ -134,7 +134,7 @@ def create_app() -> FastAPI:
     def delete_task(project: str, tid: str) -> dict[str, Any]:
         """타스크 폴더를 지운다. 살아 있는 세션이 있으면 거부."""
         ref = _run(core.delete_task, _ref(project, tid))
-        return {"deleted": ref, "note": f"{ref}을(를) 지웠습니다."}
+        return {"deleted": ref, "note": f"Deleted {ref}"}
 
     @app.post("/api/tasks/{project}/{tid}/status")
     def set_status(project: str, tid: str, body: StatusIn) -> dict[str, Any]:
