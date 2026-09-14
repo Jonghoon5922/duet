@@ -353,8 +353,7 @@ def fingerprint() -> str:
         except OSError:
             continue
     parts.append(str(sorted(p.name for p in folders)))
-    digest = hashlib.blake2b("
-".join(sorted(parts)).encode("utf-8"), digest_size=8).hexdigest()
+    digest = hashlib.blake2b("\n".join(sorted(parts)).encode("utf-8"), digest_size=8).hexdigest()
     return f"{len(parts)}:{digest}"
 
 
