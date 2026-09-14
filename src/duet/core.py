@@ -36,6 +36,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -346,11 +347,15 @@ def fingerprint() -> str:
             with os.scandir(folder) as it:
                 for entry in it:
                     if entry.is_file() and (entry.name.endswith(".json") or entry.name == "task.md"):
-                        parts.append(f"{entry.path}:{entry.stat().st_mtime_ns}")
+                        # 같은 틱 안에 두 번 쓰면 수정 시각이 같을 수 있다. 크기를 같이 본다.
+                        st = entry.stat()
+                        parts.append(f"{entry.path}:{st.st_mtime_ns}:{st.st_size}")
         except OSError:
             continue
     parts.append(str(sorted(p.name for p in folders)))
-    return f"{len(parts)}:{hash(tuple(sorted(parts))) & 0xFFFFFFFF:08x}"
+    digest = hashlib.blake2b("
+".join(sorted(parts)).encode("utf-8"), digest_size=8).hexdigest()
+    return f"{len(parts)}:{digest}"
 
 
 def archive_dir() -> Path:
