@@ -259,6 +259,7 @@ let drawn = null;       // 마지막으로 그린 내용. 같으면 다시 그�
 const opened = new Set();  // 펼쳐 둔 타스크 ref·세션 id
 let newTaskProject = "";   // 새 타스크 대화상자가 열린 프로젝트
 let about = { version: "", repo: "", projects: 0 };  // 피드백 본문 끝에 붙일 것
+let page = null;   // 이 탭이 처음 받은 화면 도장. 서버 것이 달라지면 화면 코드가 바뀐 것이다
 
 const $ = (s) => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => {
@@ -572,6 +573,10 @@ async function refresh(force = false) {
   try {
     const data = await api(archived ? "/api/archive" : "/api/tasks");
     const count = archived ? new Set(data.tasks.map((t) => t.project)).size : (data.projects || []).length;
+    // 재설치로 화면 파일이 바뀌었다. 데이터는 매번 새로 읽지만 화면 코드는 탭이 들고 있으므로
+    // 여기서 한 번 스스로 새로고침한다. 편집 중이면 그 입력이 날아가니 끝날 때까지 미룬다.
+    if (page === null) page = data.page;
+    else if (data.page && data.page !== page && !busy()) { location.reload(); return; }
     $("#pulse").classList.add("on");
     $("#pulse").title = data.home;
     about = { version: data.version || "", repo: data.repo || "", projects: count };  // 경로는 볼 일이 드물다. 점에 마우스를 올리면 나온다

@@ -26,6 +26,7 @@ def test_보드가_타스크를_내려준다(client):
     assert body["tasks"][0]["counts"] == {"진행중": 1, "완료": 0, "중지": 0}
     assert body["projects"] == ["nefss"]
     assert body["repo"].startswith("https://github.com/") and body["version"]
+    assert body["page"].startswith(body["version"])
 
 
 def test_상세에_세션과_진행_로그가_들어온다(client):

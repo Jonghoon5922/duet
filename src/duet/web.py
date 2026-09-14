@@ -56,6 +56,14 @@ class EditIn(BaseModel):
     project: str | None = None
 
 
+def _page_stamp() -> str:
+    """화면 파일의 도장. 재설치로 파일이 바뀌면 열린 탭이 이걸 보고 스스로 새로고침한다."""
+    try:
+        return f"{__version__}-{int(PAGE.stat().st_mtime)}"
+    except OSError:
+        return __version__
+
+
 def _ref(project: str, tid: str) -> str:
     return f"{project}/{tid}"
 
@@ -92,6 +100,7 @@ def create_app() -> FastAPI:
             "archived": len({t.project for t in core.list_archived()}),
             "version": __version__,
             "repo": REPO_URL,
+            "page": _page_stamp(),
         }
 
     @app.post("/api/tasks", status_code=201)
@@ -102,7 +111,7 @@ def create_app() -> FastAPI:
     def archive() -> dict[str, Any]:
         rows = [t.to_detail() for t in core.list_archived()]
         return {"tasks": rows, "archived": len({t.project for t in core.list_archived()}), "home": str(core.home()),
-                "version": __version__, "repo": REPO_URL}
+                "version": __version__, "repo": REPO_URL, "page": _page_stamp()}
 
     @app.post("/api/projects/archive")
     def archive_project(body: ProjectIn) -> dict[str, Any]:
